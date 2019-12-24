@@ -3,13 +3,11 @@ TARGET = qtsocketcanbus
 QT = core serialbus
 
 HEADERS += \
-    libsocketcan.h \
-    socketcanbackend.h
+    src/socketcanbackend.h
 
 SOURCES += \
-    libsocketcan.cpp \
-    main.cpp \
-    socketcanbackend.cpp
+    src/main.cpp \
+    src/socketcanbackend.cpp
 
 DISTFILES = plugin.json
 

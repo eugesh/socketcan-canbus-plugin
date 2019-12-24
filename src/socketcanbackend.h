@@ -45,18 +45,7 @@
 #include <QtCore/qstring.h>
 #include <QtCore/qvariant.h>
 
-// The order of the following includes is mandatory, because some
-// distributions use sa_family_t in can.h without including socket.h
-#include <sys/socket.h>
-#include <sys/uio.h>
-#include <linux/can.h>
-#include <sys/time.h>
-
-#include <memory>
-
 QT_BEGIN_NAMESPACE
-
-class LibSocketCan;
 
 class SocketCanBackend : public QCanBusDevice
 {
@@ -83,21 +72,9 @@ private:
     void resetConfigurations();
     bool connectSocket();
     bool applyConfigurationParameter(int key, const QVariant &value);
-    void resetController();
-    bool hasBusStatus() const;
-    QCanBusDevice::CanBusStatus busStatus() const;
-
-    int protocol = CAN_RAW;
-    canfd_frame m_frame;
-    sockaddr_can m_address;
-    msghdr m_msg;
-    iovec m_iov;
-    sockaddr_can m_addr;
-    char m_ctrlmsg[CMSG_SPACE(sizeof(timeval)) + CMSG_SPACE(sizeof(__u32))];
 
     qint64 canSocket = -1;
     QSocketNotifier *notifier = nullptr;
-    std::unique_ptr<LibSocketCan> libSocketCan;
     QString canSocketName;
     bool canFdOptionEnabled = false;
 };

@@ -40,11 +40,9 @@
 #include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbusfactory.h>
 
-#include <QtCore/qloggingcategory.h>
+#include <QtCore/qfile.h>
 
 QT_BEGIN_NAMESPACE
-
-Q_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_SOCKETCAN, "qt.canbus.plugins.socketcan")
 
 //! [SocketCanFactory]
 class SocketCanBusPlugin : public QObject, public QCanBusFactoryV2

@@ -36,20 +36,14 @@
 
 #include "socketcanbackend.h"
 
-#include "libsocketcan.h"
-
-#include <QtSerialBus/qcanbusdevice.h>
-
 #include <QtCore/qdatastream.h>
 #include <QtCore/qdebug.h>
 #include <QtCore/qdiriterator.h>
 #include <QtCore/qfile.h>
-#include <QtCore/qloggingcategory.h>
 #include <QtCore/qsocketnotifier.h>
 
 #include <linux/can/error.h>
 #include <linux/can/raw.h>
-#include <linux/sockios.h>
 #include <errno.h>
 #include <unistd.h>
 #include <net/if.h>
@@ -89,11 +83,7 @@ struct canfd_frame {
 
 QT_BEGIN_NAMESPACE
 
-Q_DECLARE_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_SOCKETCAN)
-
 const char sysClassNetC[] = "/sys/class/net/";
-const char interfaceC[]   = "/device/interface";
-const char devIdC[]       = "/dev_id";
 const char flagsC[]       = "/flags";
 const char mtuC[]         = "/mtu";
 const char typeC[]        = "/type";
@@ -134,23 +124,6 @@ static quint32 flags(const QString &canDevice)
     return result;
 }
 
-static QString deviceDescription(const QString &canDevice)
-{
-    const QString path = QLatin1String(sysClassNetC) + canDevice + QLatin1String(interfaceC);
-    const QByteArray content = fileContent(path);
-    if (content.isEmpty() && isVirtual(canDevice))
-        return QStringLiteral("Virtual CAN");
-
-    return QString::fromUtf8(content);
-}
-
-static int deviceChannel(const QString &canDevice)
-{
-    const QString path = QLatin1String(sysClassNetC) + canDevice + QLatin1String(devIdC);
-    const QByteArray content = fileContent(path);
-    return content.toInt(nullptr, 0);
-}
-
 QList<QCanBusDeviceInfo> SocketCanBackend::interfaces()
 {
     QList<QCanBusDeviceInfo> result;
@@ -167,12 +140,9 @@ QList<QCanBusDeviceInfo> SocketCanBackend::interfaces()
         if (!(flags(deviceName) & DeviceIsActive))
             continue;
 
-        const QString serial;
-        const QString description = deviceDescription(deviceName);
-        const int channel = deviceChannel(deviceName);
-        result.append(std::move(createDeviceInfo(deviceName, serial, description,
-                                                 channel, isVirtual(deviceName),
-                                                 isFlexibleDataRateCapable(deviceName))));
+        auto info = createDeviceInfo(deviceName, isVirtual(deviceName),
+                                     isFlexibleDataRateCapable(deviceName));
+        result.append(info);
     }
 
     std::sort(result.begin(), result.end(),
@@ -186,25 +156,7 @@ QList<QCanBusDeviceInfo> SocketCanBackend::interfaces()
 SocketCanBackend::SocketCanBackend(const QString &name) :
     canSocketName(name)
 {
-    QString errorString;
-    libSocketCan.reset(new LibSocketCan(&errorString));
-    if (Q_UNLIKELY(!errorString.isEmpty())) {
-        qCInfo(QT_CANBUS_PLUGINS_SOCKETCAN,
-               "Cannot load library libsocketcan, some functionality will not be available.\n%ls",
-               qUtf16Printable(errorString));
-    }
-
     resetConfigurations();
-
-    std::function<void()> f = std::bind(&SocketCanBackend::resetController, this);
-    setResetControllerFunction(f);
-
-    if (hasBusStatus()) {
-        // Only register busStatus when libsocketcan is available
-        // QCanBusDevice::hasBusStatus() will return false otherwise
-        std::function<CanBusStatus()> g = std::bind(&SocketCanBackend::busStatus, this);
-        setCanBusStatusGetter(g);
-    }
 }
 
 SocketCanBackend::~SocketCanBackend()
@@ -223,8 +175,6 @@ void SocketCanBackend::resetConfigurations()
                 QVariant::fromValue(QCanBusFrame::FrameErrors(QCanBusFrame::AnyError)));
     QCanBusDevice::setConfigurationParameter(
                 QCanBusDevice::CanFdKey, false);
-    QCanBusDevice::setConfigurationParameter(
-                QCanBusDevice::BitRateKey, 500000);
 }
 
 bool SocketCanBackend::open()
@@ -299,7 +249,7 @@ bool SocketCanBackend::applyConfigurationParameter(int key, const QVariant &valu
             socklen_t s = sizeof(can_filter);
             if (Q_UNLIKELY(setsockopt(canSocket, SOL_CAN_RAW, CAN_RAW_FILTER,
                            &filters, s) != 0)) {
-                qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "Cannot unset socket filters.");
+                qWarning("Cannot unset socket filters");
                 setError(qt_error_string(errno),
                          QCanBusDevice::CanBusError::ConfigurationError);
                 break;
@@ -312,7 +262,9 @@ bool SocketCanBackend::applyConfigurationParameter(int key, const QVariant &valu
         filters.resize(filterList.size());
         for (int i = 0; i < filterList.size(); i++) {
             const QCanBusDevice::Filter f = filterList.at(i);
-            can_filter filter = { f.frameId, f.frameIdMask };
+            can_filter filter;
+            filter.can_id = f.frameId;
+            filter.can_mask = f.frameIdMask;
 
             // frame type filter
             switch (f.type) {
@@ -370,26 +322,22 @@ bool SocketCanBackend::applyConfigurationParameter(int key, const QVariant &valu
         success = true;
         break;
     }
-    case QCanBusDevice::BitRateKey:
-    {
-        const quint32 bitRate = value.toUInt();
-        libSocketCan->setBitrate(canSocketName, bitRate);
-        break;
-    }
     default:
         setError(tr("SocketCanBackend: No such configuration as %1 in SocketCanBackend").arg(key),
                  QCanBusDevice::CanBusError::ConfigurationError);
         break;
     }
 
+    //qDebug() << "applyConfiguration" << key << value << success;
     return success;
 }
 
 bool SocketCanBackend::connectSocket()
 {
+    struct sockaddr_can address;
     struct ifreq interface;
 
-    if (Q_UNLIKELY((canSocket = socket(PF_CAN, SOCK_RAW | SOCK_NONBLOCK, protocol)) < 0)) {
+    if (Q_UNLIKELY((canSocket = socket(PF_CAN, SOCK_RAW | SOCK_NONBLOCK, CAN_RAW)) < 0)) {
         setError(qt_error_string(errno),
                  QCanBusDevice::CanBusError::ConnectionError);
         return false;
@@ -402,20 +350,14 @@ bool SocketCanBackend::connectSocket()
         return false;
     }
 
-    m_address.can_family  = AF_CAN;
-    m_address.can_ifindex = interface.ifr_ifindex;
+    address.can_family  = AF_CAN;
+    address.can_ifindex = interface.ifr_ifindex;
 
-    if (Q_UNLIKELY(bind(canSocket, reinterpret_cast<struct sockaddr *>(&m_address), sizeof(m_address)) < 0)) {
+    if (Q_UNLIKELY(bind(canSocket, reinterpret_cast<struct sockaddr *>(&address), sizeof(address)) < 0)) {
         setError(qt_error_string(errno),
                  QCanBusDevice::CanBusError::ConnectionError);
         return false;
     }
-
-    m_iov.iov_base = &m_frame;
-    m_msg.msg_name = &m_address;
-    m_msg.msg_iov = &m_iov;
-    m_msg.msg_iovlen = 1;
-    m_msg.msg_control = &m_ctrlmsg;
 
     delete notifier;
 
@@ -429,8 +371,8 @@ bool SocketCanBackend::connectSocket()
         const QVariant param = configurationParameter(key);
         bool success = applyConfigurationParameter(key, param);
         if (Q_UNLIKELY(!success)) {
-            qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "Cannot apply parameter: %d with value: %ls.",
-                      key, qUtf16Printable(param.toString()));
+            qWarning("Cannot apply parameter: %d with value: %ls",
+                     key, qUtf16Printable(param.toString()));
         }
     }
 
@@ -464,16 +406,6 @@ void SocketCanBackend::setConfigurationParameter(int key, const QVariant &value)
                 return;
             }
         }
-    } else if (key == QCanBusDevice::ProtocolKey) {
-        bool ok = false;
-        const int newProtocol = value.toInt(&ok);
-        if (Q_UNLIKELY(!ok || (newProtocol < 0))) {
-            const QString errorString = tr("Cannot set protocol to value %1.").arg(value.toString());
-            setError(errorString, QCanBusDevice::ConfigurationError);
-            qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "%ls", qUtf16Printable(errorString));
-            return;
-        }
-        protocol = newProtocol;
     }
     // connected & params not applyable/invalid
     if (canSocket != -1 && !applyConfigurationParameter(key, value))
@@ -503,13 +435,13 @@ bool SocketCanBackend::writeFrame(const QCanBusFrame &newData)
     if (newData.frameType() == QCanBusFrame::RemoteRequestFrame) {
         canId |= CAN_RTR_FLAG;
     } else if (newData.frameType() == QCanBusFrame::ErrorFrame) {
-        canId = static_cast<canid_t>((newData.error() & QCanBusFrame::AnyError));
+        canId = (uint)(newData.error() & QCanBusFrame::AnyError);
         canId |= CAN_ERR_FLAG;
     }
 
     if (Q_UNLIKELY(!canFdOptionEnabled && newData.hasFlexibleDataRateFormat())) {
-        const QString error = tr("Cannot write CAN FD frame because CAN FD option is not enabled.");
-        qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "%ls", qUtf16Printable(error));
+        const QString error = tr("Sending CAN FD frame although CAN FD option not enabled.");
+        qDebug("%ls", qUtf16Printable(error));
         setError(error, QCanBusDevice::WriteError);
         return false;
     }
@@ -517,7 +449,7 @@ bool SocketCanBackend::writeFrame(const QCanBusFrame &newData)
     qint64 bytesWritten = 0;
     if (newData.hasFlexibleDataRateFormat()) {
         canfd_frame frame;
-        ::memset(&frame, 0, sizeof(frame));
+        memset(&frame, 0, sizeof(frame));
         frame.len = newData.payload().size();
         frame.can_id = canId;
         frame.flags = newData.hasBitrateSwitch() ? CANFD_BRS : 0;
@@ -527,7 +459,7 @@ bool SocketCanBackend::writeFrame(const QCanBusFrame &newData)
         bytesWritten = ::write(canSocket, &frame, sizeof(frame));
     } else {
         can_frame frame;
-        ::memset(&frame, 0, sizeof(frame));
+        memset(&frame, 0, sizeof(frame));
         frame.can_dlc = newData.payload().size();
         frame.can_id = canId;
         ::memcpy(frame.data, newData.payload().constData(), frame.can_dlc);
@@ -714,13 +646,10 @@ void SocketCanBackend::readSocket()
     QVector<QCanBusFrame> newFrames;
 
     for (;;) {
-        ::memset(&m_frame, 0, sizeof(m_frame));
-        m_iov.iov_len = sizeof(m_frame);
-        m_msg.msg_namelen = sizeof(m_addr);
-        m_msg.msg_controllen = sizeof(m_ctrlmsg);
-        m_msg.msg_flags = 0;
+        struct canfd_frame frame;
+        int bytesReceived;
 
-        const int bytesReceived = ::recvmsg(canSocket, &m_msg, 0);
+        bytesReceived = ::read(canSocket, &frame, sizeof(frame));
 
         if (bytesReceived <= 0) {
             break;
@@ -728,7 +657,7 @@ void SocketCanBackend::readSocket()
             setError(tr("ERROR SocketCanBackend: incomplete CAN frame"),
                      QCanBusDevice::CanBusError::ReadError);
             continue;
-        } else if (Q_UNLIKELY(m_frame.len > bytesReceived - offsetof(canfd_frame, data))) {
+        } else if (Q_UNLIKELY(frame.len > bytesReceived - offsetof(canfd_frame, data))) {
             setError(tr("ERROR SocketCanBackend: invalid CAN frame length"),
                      QCanBusDevice::CanBusError::ReadError);
             continue;
@@ -738,7 +667,7 @@ void SocketCanBackend::readSocket()
         if (Q_UNLIKELY(ioctl(canSocket, SIOCGSTAMP, &timeStamp) < 0)) {
             setError(qt_error_string(errno),
                      QCanBusDevice::CanBusError::ReadError);
-            ::memset(&timeStamp, 0, sizeof(timeStamp));
+            memset(&timeStamp, 0, sizeof(timeStamp));
         }
 
         const QCanBusFrame::TimeStamp stamp(timeStamp.tv_sec, timeStamp.tv_usec);
@@ -746,44 +675,27 @@ void SocketCanBackend::readSocket()
         bufferedFrame.setTimeStamp(stamp);
         bufferedFrame.setFlexibleDataRateFormat(bytesReceived == CANFD_MTU);
 
-        bufferedFrame.setExtendedFrameFormat(m_frame.can_id & CAN_EFF_FLAG);
-        Q_ASSERT(m_frame.len <= CANFD_MAX_DLEN);
+        bufferedFrame.setExtendedFrameFormat(frame.can_id & CAN_EFF_FLAG);
+        Q_ASSERT(frame.len <= CANFD_MAX_DLEN);
 
-        if (m_frame.can_id & CAN_RTR_FLAG)
+        if (frame.can_id & CAN_RTR_FLAG)
             bufferedFrame.setFrameType(QCanBusFrame::RemoteRequestFrame);
-        if (m_frame.can_id & CAN_ERR_FLAG)
+        if (frame.can_id & CAN_ERR_FLAG)
             bufferedFrame.setFrameType(QCanBusFrame::ErrorFrame);
-        if (m_frame.flags & CANFD_BRS)
+        if (frame.flags & CANFD_BRS)
             bufferedFrame.setBitrateSwitch(true);
-        if (m_frame.flags & CANFD_ESI)
+        if (frame.flags & CANFD_ESI)
             bufferedFrame.setErrorStateIndicator(true);
-        if (m_msg.msg_flags & MSG_CONFIRM)
-            bufferedFrame.setLocalEcho(true);
 
-        bufferedFrame.setFrameId(m_frame.can_id & CAN_EFF_MASK);
+        bufferedFrame.setFrameId(frame.can_id & CAN_EFF_MASK);
 
-        const QByteArray load(reinterpret_cast<char *>(m_frame.data), m_frame.len);
+        const QByteArray load(reinterpret_cast<char *>(frame.data), frame.len);
         bufferedFrame.setPayload(load);
 
         newFrames.append(std::move(bufferedFrame));
     }
 
     enqueueReceivedFrames(newFrames);
-}
-
-void SocketCanBackend::resetController()
-{
-    libSocketCan->restart(canSocketName);
-}
-
-bool SocketCanBackend::hasBusStatus() const
-{
-    return libSocketCan->hasBusStatus();
-}
-
-QCanBusDevice::CanBusStatus SocketCanBackend::busStatus() const
-{
-    return libSocketCan->busStatus(canSocketName);
 }
 
 QT_END_NAMESPACE
