@@ -34,7 +34,7 @@
 **
 ****************************************************************************/
 
-#include "socketcanbackend.h"
+#include "socketcanbackend_v2.h"
 
 #include <QtCore/qdatastream.h>
 #include <QtCore/qdebug.h>
@@ -124,7 +124,7 @@ static quint32 flags(const QString &canDevice)
     return result;
 }
 
-QList<QCanBusDeviceInfo> SocketCanBackend::interfaces()
+QList<QCanBusDeviceInfo> SocketCanBackend_v2::interfaces()
 {
     QList<QCanBusDeviceInfo> result;
     QDirIterator it(sysClassNetC,
@@ -153,18 +153,18 @@ QList<QCanBusDeviceInfo> SocketCanBackend::interfaces()
     return result;
 }
 
-SocketCanBackend::SocketCanBackend(const QString &name) :
+SocketCanBackend_v2::SocketCanBackend_v2(const QString &name) :
     canSocketName(name)
 {
     resetConfigurations();
 }
 
-SocketCanBackend::~SocketCanBackend()
+SocketCanBackend_v2::~SocketCanBackend_v2()
 {
     close();
 }
 
-void SocketCanBackend::resetConfigurations()
+void SocketCanBackend_v2::resetConfigurations()
 {
     QCanBusDevice::setConfigurationParameter(
                 QCanBusDevice::LoopbackKey, true);
@@ -177,7 +177,7 @@ void SocketCanBackend::resetConfigurations()
                 QCanBusDevice::CanFdKey, false);
 }
 
-bool SocketCanBackend::open()
+bool SocketCanBackend_v2::open()
 {
     if (canSocket == -1) {
         if (!connectSocket()) {
@@ -190,7 +190,7 @@ bool SocketCanBackend::open()
     return true;
 }
 
-void SocketCanBackend::close()
+void SocketCanBackend_v2::close()
 {
     ::close(canSocket);
     canSocket = -1;
@@ -198,7 +198,7 @@ void SocketCanBackend::close()
     setState(QCanBusDevice::UnconnectedState);
 }
 
-bool SocketCanBackend::applyConfigurationParameter(int key, const QVariant &value)
+bool SocketCanBackend_v2::applyConfigurationParameter(int key, const QVariant &value)
 {
     bool success = false;
 
@@ -332,7 +332,7 @@ bool SocketCanBackend::applyConfigurationParameter(int key, const QVariant &valu
     return success;
 }
 
-bool SocketCanBackend::connectSocket()
+bool SocketCanBackend_v2::connectSocket()
 {
     struct sockaddr_can address;
     struct ifreq interface;
@@ -363,7 +363,7 @@ bool SocketCanBackend::connectSocket()
 
     notifier = new QSocketNotifier(canSocket, QSocketNotifier::Read, this);
     connect(notifier, &QSocketNotifier::activated,
-            this, &SocketCanBackend::readSocket);
+            this, &SocketCanBackend_v2::readSocket);
 
     //apply all stored configurations
     const auto keys = configurationKeys();
@@ -379,7 +379,7 @@ bool SocketCanBackend::connectSocket()
     return true;
 }
 
-void SocketCanBackend::setConfigurationParameter(int key, const QVariant &value)
+void SocketCanBackend_v2::setConfigurationParameter(int key, const QVariant &value)
 {
     if (key == QCanBusDevice::RawFilterKey) {
         //verify valid/supported filters
@@ -418,7 +418,7 @@ void SocketCanBackend::setConfigurationParameter(int key, const QVariant &value)
         canFdOptionEnabled = value.toBool();
 }
 
-bool SocketCanBackend::writeFrame(const QCanBusFrame &newData)
+bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
 {
     if (state() != ConnectedState)
         return false;
@@ -478,7 +478,7 @@ bool SocketCanBackend::writeFrame(const QCanBusFrame &newData)
     return true;
 }
 
-QString SocketCanBackend::interpretErrorFrame(const QCanBusFrame &errorFrame)
+QString SocketCanBackend_v2::interpretErrorFrame(const QCanBusFrame &errorFrame)
 {
     if (errorFrame.frameType() != QCanBusFrame::ErrorFrame)
         return QString();
@@ -641,7 +641,7 @@ QString SocketCanBackend::interpretErrorFrame(const QCanBusFrame &errorFrame)
     return errorMsg;
 }
 
-void SocketCanBackend::readSocket()
+void SocketCanBackend_v2::readSocket()
 {
     QVector<QCanBusFrame> newFrames;
 

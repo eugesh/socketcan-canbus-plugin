@@ -34,7 +34,7 @@
 **
 ****************************************************************************/
 
-#include "socketcanbackend.h"
+#include "socketcanbackend_v2.h"
 
 #include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusdevice.h>
@@ -44,8 +44,8 @@
 
 QT_BEGIN_NAMESPACE
 
-//! [SocketCanFactory]
-class SocketCanBusPlugin : public QObject, public QCanBusFactoryV2
+//! [SocketCanFactoryV2]
+class SocketCanBusPluginV2 : public QObject, public QCanBusFactoryV2
 {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QCanBusFactory" FILE "plugin.json")
@@ -54,18 +54,18 @@ class SocketCanBusPlugin : public QObject, public QCanBusFactoryV2
 public:
     QList<QCanBusDeviceInfo> availableDevices(QString *errorMessage) const override
     {
-        Q_UNUSED(errorMessage);
-        return SocketCanBackend::interfaces();
+        Q_UNUSED(errorMessage)
+        return SocketCanBackend_v2::interfaces();
     }
 
     QCanBusDevice *createDevice(const QString &interfaceName, QString *errorMessage) const override
     {
-        Q_UNUSED(errorMessage);
-        auto device = new SocketCanBackend(interfaceName);
+        Q_UNUSED(errorMessage)
+        auto device = new SocketCanBackend_v2(interfaceName);
         return device;
     }
 };
-//! [SocketCanFactory]
+//! [SocketCanFactoryV2]
 
 QT_END_NAMESPACE
 

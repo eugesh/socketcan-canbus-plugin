@@ -47,12 +47,12 @@
 
 QT_BEGIN_NAMESPACE
 
-class SocketCanBackend : public QCanBusDevice
+class SocketCanBackend_v2 : public QCanBusDevice
 {
     Q_OBJECT
 public:
-    explicit SocketCanBackend(const QString &name);
-    ~SocketCanBackend();
+    explicit SocketCanBackend_v2(const QString &name);
+    ~SocketCanBackend_v2();
 
     bool open() override;
     void close() override;
