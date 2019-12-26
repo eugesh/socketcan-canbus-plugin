@@ -95,6 +95,36 @@ enum {
     DeviceIsActive = 1
 };
 
+// ssize_t write(int fd, const void *buf, size_t count);
+/**
+ * @brief writeCANFrame writes any CAN and CAN FD frames.
+ * @param canSocket
+ * @param buf
+ * @param count
+ * @return bytes written.
+ */
+qint64 writeCANFrame(int canSocket, const void *buf, size_t count) {
+    struct pollfd fds;
+
+    fds.fd = canSocket;
+    fds.events = POLLOUT;
+
+    while (::write(canSocket, buf, count) != count) {
+        if (errno != ENOBUFS){
+            perror("write");
+            return -1;
+        }
+        else {
+            if (poll(&fds, 1, 1) < 0) {
+                perror("poll");
+                return -1;
+            }
+        }
+    }
+
+    return count;
+}
+
 static QByteArray fileContent(const QString &fileName)
 {
     QFile file(fileName);
@@ -456,7 +486,8 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
         frame.flags |= newData.hasErrorStateIndicator() ? CANFD_ESI : 0;
         ::memcpy(frame.data, newData.payload().constData(), frame.len);
 
-        bytesWritten = ::write(canSocket, &frame, sizeof(frame));
+        // bytesWritten = ::write(canSocket, &frame, sizeof(frame));
+        bytesWritten = writeCANFrame(canSocket, &frame, sizeof(frame));
     } else {
         can_frame frame;
         memset(&frame, 0, sizeof(frame));
@@ -464,7 +495,8 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
         frame.can_id = canId;
         ::memcpy(frame.data, newData.payload().constData(), frame.can_dlc);
 
-        bytesWritten = ::write(canSocket, &frame, sizeof(frame));
+        // bytesWritten = ::write(canSocket, &frame, sizeof(frame));
+        bytesWritten = writeCANFrame(canSocket, &frame, sizeof(frame));
     }
 
     if (Q_UNLIKELY(bytesWritten < 0)) {
