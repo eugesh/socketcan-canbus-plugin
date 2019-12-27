@@ -49,6 +49,9 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <linux/can.h>
+#include <poll.h>
+#include <errno.h>
 
 #ifndef CANFD_MTU
 // CAN FD support was added by Linux kernel 3.6
@@ -95,12 +98,11 @@ enum {
     DeviceIsActive = 1
 };
 
-// ssize_t write(int fd, const void *buf, size_t count);
 /**
- * @brief writeCANFrame writes any CAN and CAN FD frames.
- * @param canSocket
- * @param buf
- * @param count
+ * @brief writeCANFrame writes any can_frame or canfd_frame in opened socket.
+ * @param canSocket opened socket descriptor;
+ * @param buf CAN frame;
+ * @param count CAN frame's length (CAN_MTU or CANFD_MTU);
  * @return bytes written.
  */
 qint64 writeCANFrame(int canSocket, const void *buf, size_t count) {
@@ -115,6 +117,7 @@ qint64 writeCANFrame(int canSocket, const void *buf, size_t count) {
             return -1;
         }
         else {
+            // Waits no more than 1 millisecond when descriptor becomes ready or the call is interrupted by a signal handler.
             if (poll(&fds, 1, 1) < 0) {
                 perror("poll");
                 return -1;
