@@ -502,7 +502,7 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
         bytesWritten = writeCANFrame(canSocket, &frame, sizeof(frame));
     }
 
-    if (Q_UNLIKELY(bytesWritten < 0)) {
+    if (bytesWritten < 0) {
         setError(qt_error_string(errno),
                  QCanBusDevice::CanBusError::WriteError);
         return false;

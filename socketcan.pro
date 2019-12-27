@@ -9,7 +9,8 @@ SOURCES += \
     src/main.cpp \
     src/socketcanbackend_v2.cpp
 
-DISTFILES = plugin.json
+DISTFILES = plugin.json \
+    CMakeLists.txt
 
 PLUGIN_TYPE = canbus
 PLUGIN_CLASS_NAME = SocketCanBusPluginV2
