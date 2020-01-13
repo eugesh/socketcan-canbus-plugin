@@ -31,6 +31,8 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
 find_package(Qt5 COMPONENTS PrintSupport Network Gui Core Widgets SerialPort SerialBus REQUIRED)
 
 SET(Qt5SerialBus_DIR QT_PATH/lib/cmake/Qt5SerialBus)
+SET(Qt5PrintSupport_DIR QT_PATH/lib/cmake/Qt5PrintSupport)
+SET(Qt5Core_DIR QT_PATH/lib/cmake/Qt5Core)
 #qt5_wrap_ui (UI_HEADERS unicanserver.ui)
 #qt5_add_resources (QRCS resources/pics.qrc)
 
