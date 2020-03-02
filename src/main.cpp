@@ -41,6 +41,7 @@
 #include <QtSerialBus/qcanbusfactory.h>
 
 #include <QtCore/qfile.h>
+#include <QtCore/qloggingcategory.h>
 
 QT_BEGIN_NAMESPACE
 

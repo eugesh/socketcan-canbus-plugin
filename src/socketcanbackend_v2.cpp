@@ -40,6 +40,7 @@
 #include <QtCore/qdebug.h>
 #include <QtCore/qdiriterator.h>
 #include <QtCore/qfile.h>
+#include <QtCore/qloggingcategory.h>
 #include <QtCore/qsocketnotifier.h>
 
 #include <linux/can/error.h>
@@ -86,6 +87,8 @@ struct canfd_frame {
 #endif
 
 QT_BEGIN_NAMESPACE
+
+Q_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_SOCKETCAN, "qt.canbus.plugins.socketcan")
 
 const char sysClassNetC[] = "/sys/class/net/";
 const char flagsC[]       = "/flags";
@@ -214,7 +217,7 @@ void SocketCanBackend_v2::resetConfigurations()
 bool SocketCanBackend_v2::open()
 {
     if (canSocket == -1) {
-        if (!connectSocket()) {
+        if (! connectSocket()) {
             close(); // sets UnconnectedState
             return false;
         }
@@ -226,7 +229,13 @@ bool SocketCanBackend_v2::open()
 
 void SocketCanBackend_v2::close()
 {
-    ::close(canSocket);
+    if (canSocket > -1) {
+        if (Q_UNLIKELY(::close(canSocket) == -1)) {
+            const QString err = tr("Error closing socket %1, result = %2")
+                       .arg(canSocket).arg(errno);
+            qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "%ls", qUtf16Printable(err));
+        }
+    }
     canSocket = -1;
 
     setState(QCanBusDevice::UnconnectedState);
@@ -374,6 +383,7 @@ bool SocketCanBackend_v2::connectSocket()
     if (Q_UNLIKELY((canSocket = socket(PF_CAN, SOCK_RAW | SOCK_NONBLOCK, CAN_RAW)) < 0)) {
         setError(qt_error_string(errno),
                  QCanBusDevice::CanBusError::ConnectionError);
+        canSocket = -1;
         return false;
     }
 
