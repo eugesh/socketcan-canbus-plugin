@@ -464,6 +464,13 @@ void SocketCanBackend_v2::setConfigurationParameter(int key, const QVariant &val
 
 bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
 {
+    if (canSocket < 0) {
+        setError(qt_error_string(errno),
+                 QCanBusDevice::CanBusError::ConnectionError);
+        setState(QCanBusDevice::UnconnectedState);
+        return false;
+    }
+
     if (state() != ConnectedState)
         return false;
 
@@ -689,6 +696,13 @@ QString SocketCanBackend_v2::interpretErrorFrame(const QCanBusFrame &errorFrame)
 
 void SocketCanBackend_v2::readSocket()
 {
+    if (canSocket < 0) {
+        setError(qt_error_string(errno),
+                 QCanBusDevice::CanBusError::ConnectionError);
+        setState(QCanBusDevice::UnconnectedState);
+        return;
+    }
+
     QVector<QCanBusFrame> newFrames;
 
     for (;;) {
