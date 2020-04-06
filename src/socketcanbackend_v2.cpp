@@ -116,7 +116,7 @@ qint64 writeCANFrame(int canSocket, const void *buf, size_t count) {
     fds.events = POLLOUT;
 
     while (::write(canSocket, buf, count) != count) {
-        if (errno != ENOBUFS){
+        if (Q_UNLIKELY(errno != ENOBUFS && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)) {
             perror("write");
             return -1;
         }
