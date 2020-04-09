@@ -1,13 +1,9 @@
-#include <QtSerialBus/qcanbusdevice.h>
-#include <QtSerialBus/qcanbusframe.h>
-#include <QtSerialBus/qcanbus.h>
-#include <QtSerialBus/qcanbusfactory.h>
-
 #include <QtCore/qscopedpointer.h>
 #include <QtCore/qtimer.h>
 #include <QtTest/qsignalspy.h>
 #include <QtTest/qtest.h>
 #include "socketcanbackend_v2.h"
+#include "can_test_common.h"
 
 class tst_QCanBus : public QObject
 {
@@ -49,9 +45,9 @@ void tst_QCanBus::initTestCase()
 
 void tst_QCanBus::floodTrafficWrite() {
     QCanBusDevice *canDevice = nullptr;
-    canDevice = new SocketCanBackend_v2("vcan0");
+    canDevice = new SocketCanBackend_v2(find_can_device());
 
-    QVERIFY ( canDevice);
+    QVERIFY (canDevice);
     if (! canDevice) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
     }
