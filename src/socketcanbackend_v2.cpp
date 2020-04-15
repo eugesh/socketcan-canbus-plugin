@@ -426,6 +426,7 @@ bool SocketCanBackend_v2::connectSocket()
     m_msg.msg_iov = &m_iov;
     m_msg.msg_iovlen = 1;
     m_msg.msg_control = &m_ctrlmsg;
+
     delete notifier;
 
     notifier = new QSocketNotifier(canSocket, QSocketNotifier::Read, this);
@@ -522,8 +523,8 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
 
     qint64 bytesWritten = 0;
     if (newData.hasFlexibleDataRateFormat()) {
-        canfd_frame frame;
-        ::memset(&frame, 0, sizeof(frame));
+        canfd_frame frame = {};
+        // ::memset(&frame, 0, sizeof(frame));
         frame.len = newData.payload().size();
         frame.can_id = canId;
         frame.flags = newData.hasBitrateSwitch() ? CANFD_BRS : 0;
@@ -533,8 +534,8 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
         // bytesWritten = ::write(canSocket, &frame, sizeof(frame));
         bytesWritten = writeCANFrame(canSocket, &frame, sizeof(frame));
     } else {
-        can_frame frame;
-        ::memset(&frame, 0, sizeof(frame));
+        can_frame frame = {};
+        // ::memset(&frame, 0, sizeof(frame));
         frame.can_dlc = newData.payload().size();
         frame.can_id = canId;
         ::memcpy(frame.data, newData.payload().constData(), frame.can_dlc);
@@ -729,7 +730,9 @@ void SocketCanBackend_v2::readSocket()
     QVector<QCanBusFrame> newFrames;
 
     for (;;) {
-        ::memset(&m_frame, 0, sizeof(m_frame));
+        m_frame = {};
+        // ::memset(&m_frame, 0, sizeof(m_frame));
+
         m_iov.iov_len = sizeof(m_frame);
         m_msg.msg_namelen = sizeof(m_addr);
         m_msg.msg_controllen = sizeof(m_ctrlmsg);
