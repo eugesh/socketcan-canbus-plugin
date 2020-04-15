@@ -427,6 +427,12 @@ bool SocketCanBackend_v2::connectSocket()
     m_msg.msg_iovlen = 1;
     m_msg.msg_control = &m_ctrlmsg;
 
+    m_frame = {};
+    m_iov.iov_len = sizeof(m_frame);
+    m_msg.msg_namelen = sizeof(m_addr);
+    m_msg.msg_controllen = sizeof(m_ctrlmsg);
+    m_msg.msg_flags = 0;
+
     delete notifier;
 
     notifier = new QSocketNotifier(canSocket, QSocketNotifier::Read, this);
@@ -733,10 +739,10 @@ void SocketCanBackend_v2::readSocket()
         m_frame = {};
         // ::memset(&m_frame, 0, sizeof(m_frame));
 
-        m_iov.iov_len = sizeof(m_frame);
+        /*m_iov.iov_len = sizeof(m_frame);
         m_msg.msg_namelen = sizeof(m_addr);
         m_msg.msg_controllen = sizeof(m_ctrlmsg);
-        m_msg.msg_flags = 0;
+        m_msg.msg_flags = 0;*/
 
         const int bytesReceived = ::recvmsg(canSocket, &m_msg, 0);
 
