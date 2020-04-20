@@ -41,6 +41,7 @@
 #include <QtCore/qdiriterator.h>
 #include <QtCore/qfile.h>
 #include <QtCore/qloggingcategory.h>
+#include <QtCore/qscopeguard.h>
 #include <QtCore/qsocketnotifier.h>
 
 #include <linux/can/error.h>
@@ -433,12 +434,14 @@ bool SocketCanBackend_v2::connectSocket()
     m_msg.msg_controllen = sizeof(m_ctrlmsg);
     m_msg.msg_flags = 0;
 
-    delete notifier;
+    delete readNotifier;
+    delete writeNotifier;
+    readNotifier = new QSocketNotifier(canSocket, QSocketNotifier::Read, this);
+    connect(readNotifier, &QSocketNotifier::activated, this, &SocketCanBackend_v2::readSocket);
 
-    notifier = new QSocketNotifier(canSocket, QSocketNotifier::Read, this);
-    connect(notifier, &QSocketNotifier::activated,
-            this, &SocketCanBackend_v2::readSocket);
+    writeNotifier = new QSocketNotifier(canSocket, QSocketNotifier::Write, this);
 
+    connect(writeNotifier, &QSocketNotifier::activated, this, &SocketCanBackend_v2::writeSocket);
     //apply all stored configurations
     const auto keys = configurationKeys();
     for (int key : keys) {
@@ -493,6 +496,82 @@ void SocketCanBackend_v2::setConfigurationParameter(int key, const QVariant &val
 }
 
 bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
+{
+    if (state() != ConnectedState)
+        return false;
+    if (Q_UNLIKELY(!newData.isValid())) {
+        setError(tr("Cannot write invalid QCanBusFrame"), QCanBusDevice::WriteError);
+        return false;
+    }
+    enqueueOutgoingFrame(newData);
+    writeNotifier->setEnabled(true);
+
+    return true;
+}
+
+void SocketCanBackend_v2::writeSocket()
+{
+    writeNotifier->setEnabled(false);
+    auto enableWriteNotifier = qScopeGuard([this] {
+        if (hasOutgoingFrames())
+            writeNotifier->setEnabled(true);
+    });
+
+    while (hasOutgoingFrames()) {
+        const QCanBusFrame newData = peekOutgoingFrame();
+        canid_t canId = newData.frameId();
+
+        if (newData.hasExtendedFrameFormat())
+            canId |= CAN_EFF_FLAG;
+
+        if (newData.frameType() == QCanBusFrame::RemoteRequestFrame) {
+            canId |= CAN_RTR_FLAG;
+        } else if (newData.frameType() == QCanBusFrame::ErrorFrame) {
+            canId = static_cast<canid_t>((newData.error() & QCanBusFrame::AnyError));
+            canId |= CAN_ERR_FLAG;
+        }
+
+        if (Q_UNLIKELY(!canFdOptionEnabled && newData.hasFlexibleDataRateFormat())) {
+            const QString error = tr("Cannot write CAN FD frame because CAN FD option is not enabled.");
+            qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "%ls", qUtf16Printable(error));
+            setError(error, QCanBusDevice::WriteError);
+            dequeueOutgoingFrame();
+            continue;
+        }
+
+        qint64 bytesWritten = 0;
+        if (newData.hasFlexibleDataRateFormat()) {
+            canfd_frame frame = {};
+            frame.len = newData.payload().size();
+            frame.can_id = canId;
+            frame.flags = newData.hasBitrateSwitch() ? CANFD_BRS : 0;
+            frame.flags |= newData.hasErrorStateIndicator() ? CANFD_ESI : 0;
+            ::memcpy(frame.data, newData.payload().constData(), frame.len);
+
+            bytesWritten = ::write(canSocket, &frame, sizeof(frame));
+        } else {
+            can_frame frame = {};
+            frame.can_dlc = newData.payload().size();
+            frame.can_id = canId;
+            ::memcpy(frame.data, newData.payload().constData(), frame.can_dlc);
+
+            bytesWritten = ::write(canSocket, &frame, sizeof(frame));
+        }
+
+        if (Q_UNLIKELY(bytesWritten < 0)) {
+            if (Q_UNLIKELY(errno != ENOBUFS && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)) {
+                setError(qt_error_string(errno),
+                         QCanBusDevice::CanBusError::WriteError);
+                dequeueOutgoingFrame();
+            }
+            return;
+        }
+        dequeueOutgoingFrame();
+        emit framesWritten(1);
+    }
+}
+
+/*bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
 {
     if (canSocket < 0) {
         setError(qt_error_string(errno),
@@ -559,7 +638,7 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
     emit framesWritten(1);
 
     return true;
-}
+}*/
 
 QString SocketCanBackend_v2::interpretErrorFrame(const QCanBusFrame &errorFrame)
 {

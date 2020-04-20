@@ -1,7 +1,8 @@
 #ifndef CAN_TEST_COMMON_H
 #define CAN_TEST_COMMON_H
 
-#include <QtSerialBus/qcanbusdevice.h>
+// #include <QtSerialBus/qcanbusdevice.h>
+#include "qcanbusdevice_v2.h"
 #include <QtSerialBus/qcanbusframe.h>
 #include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusfactory.h>

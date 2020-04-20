@@ -62,10 +62,12 @@ void tst_QCanBus::floodTrafficWrite() {
         return;
     }
 
-    for (int i=0; i < 50000; ++i) {
+    for (int i = 0; i < 50000; ++i) {
         const uint frameId = 0x22;
         QString data = QString("E0FF");
         const QByteArray payload = QByteArray::fromHex(data.toLatin1());
+
+        // qInfo() << frameId << "#" << data;
 
         QCanBusFrame frame = QCanBusFrame(frameId, payload);
         // frame.setExtendedFrameFormat(false);
