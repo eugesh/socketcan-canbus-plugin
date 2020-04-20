@@ -5,6 +5,8 @@
 #include "socketcanbackend_v2.h"
 #include "can_test_common.h"
 
+#define LONG_MSG_TEST_NUM_LOOP 500
+
 class tst_QCanBus : public QObject
 {
     Q_OBJECT
@@ -14,10 +16,14 @@ public:
 private slots:
     void initTestCase();
     // void conf();
+    // Write many messages without time gap.
     void floodTrafficWrite();
+    // Write long UniCAN message.
+    void longUniCANWrite();
 
 private:
     QCanBus *bus = nullptr;
+    QCanBusDevice *m_canDevice = nullptr;
 };
 
 tst_QCanBus::tst_QCanBus() {
@@ -44,19 +50,18 @@ void tst_QCanBus::initTestCase()
 }
 
 void tst_QCanBus::floodTrafficWrite() {
-    QCanBusDevice *canDevice = nullptr;
-    canDevice = new SocketCanBackend_v2(find_can_device());
+    m_canDevice = new SocketCanBackend_v2(find_can_device());
 
-    QVERIFY (canDevice);
-    if (! canDevice) {
+    QVERIFY (m_canDevice);
+    if (! m_canDevice) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
     }
 
-    if (canDevice->state() == QCanBusDevice::UnconnectedState)
-        canDevice->connectDevice();
+    if (m_canDevice->state() == QCanBusDevice::UnconnectedState)
+        m_canDevice->connectDevice();
 
-    QVERIFY(canDevice->state() == QCanBusDevice::ConnectedState);
-    if (canDevice->state() == QCanBusDevice::UnconnectedState)  {
+    QVERIFY(m_canDevice->state() == QCanBusDevice::ConnectedState);
+    if (m_canDevice->state() == QCanBusDevice::UnconnectedState)  {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
 
         return;
@@ -79,7 +84,47 @@ void tst_QCanBus::floodTrafficWrite() {
         else if (m_ui->remoteFrame->isChecked())
             frame.setFrameType(QCanBusFrame::RemoteRequestFrame);*/
 
-        QVERIFY(canDevice->writeFrame(frame));
+        QVERIFY(m_canDevice->writeFrame(frame));
+    }
+}
+
+void tst_QCanBus::longUniCANWrite() {
+    // Name of file with long message
+    QString test_file = "long_CAN.txt";
+
+    for (int k = 0; k < LONG_MSG_TEST_NUM_LOOP; k++) {
+
+        QFile file(test_file);
+
+        if (!file.open(QFile::ReadOnly)) {
+            QString msg = tr("Failed to open %1\n%2")
+                            .arg(test_file)
+                            .arg(file.errorString());
+            qWarning() << tr("Error") + msg;
+            return;
+        }
+
+        while (!file.atEnd()) {
+            QByteArray line = file.readLine().simplified();
+
+            auto fields = line.split(' ');
+
+            int canId = fields[1].toUInt(nullptr, 16);
+            QByteArray len_arr = fields[2];
+            len_arr.replace('[', "");
+            len_arr.replace(']', "");
+            int len = len_arr.toUInt();
+            QByteArray payload;
+
+            for (int i = 0; i < len; ++i)
+                payload.append(QByteArray::fromHex(fields[3 + i]));
+
+            // qInfo () << canId << " [" << len << "] " << payload;
+
+            QCanBusFrame frame = QCanBusFrame(canId, payload);
+
+            QVERIFY(m_canDevice->writeFrame(frame));
+        }
     }
 }
 
