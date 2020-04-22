@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2017 The Qt Company Ltd.
+** Copyright (C) 2017 Andre Hartmann <aha_1980@gmx.de>
 ** Contact: http://www.qt.io/licensing/
 **
 ** This file is part of the QtSerialBus module of the Qt Toolkit.
@@ -34,69 +34,41 @@
 **
 ****************************************************************************/
 
-#ifndef SOCKETCANBACKEND_H
-#define SOCKETCANBACKEND_H
+#ifndef QCANBUSDEVICEINFO_P_H
+#define QCANBUSDEVICEINFO_P_H
 
-//#include <QtSerialBus/qcanbusframe.h>
-#include "qcanbusframe_v2.h"
-#include "qcanbusdevice_v2.h"
-//#include <QtSerialBus/qcanbusdeviceinfo.h>
-#include "qcanbusdeviceinfo_v2.h"
+//
+//  W A R N I N G
+//  -------------
+//
+// This file is not part of the Qt API.  It exists purely as an
+// implementation detail.  This header file may change from version to
+// version without notice, or even be removed.
+//
+// We mean it.
+//
 
-#include <QtCore/qsocketnotifier.h>
+#include <QtCore/qshareddata.h>
 #include <QtCore/qstring.h>
-#include <QtCore/qvariant.h>
-
-// The order of the following includes is mandatory, because some
-// distributions use sa_family_t in can.h without including socket.h
-#include <sys/socket.h>
-#include <sys/uio.h>
-#include <linux/can.h>
-#include <sys/time.h>
 
 QT_BEGIN_NAMESPACE
 
-class SocketCanBackend_v2 : public QCanBusDevice
-{
-    Q_OBJECT
+class QCanBusDeviceInfoPrivate : public QSharedData {
 public:
-    explicit SocketCanBackend_v2(const QString &name);
-    ~SocketCanBackend_v2();
+    QCanBusDeviceInfoPrivate() { }
 
-    bool open() override;
-    void close() override;
+    ~QCanBusDeviceInfoPrivate()
+    {
+    }
 
-    void setConfigurationParameter(int key, const QVariant &value) override;
-
-    bool writeFrame(const QCanBusFrame &newData) override;
-
-    QString interpretErrorFrame(const QCanBusFrame &errorFrame) override;
-
-    static QList<QCanBusDeviceInfo> interfaces();
-
-private Q_SLOTS:
-    void readSocket();
-    void writeSocket(int socket);
-
-private:
-    void resetConfigurations();
-    bool connectSocket();
-    bool applyConfigurationParameter(int key, const QVariant &value);
-
-    canfd_frame m_frame;
-    sockaddr_can m_address;
-    msghdr m_msg;
-    iovec m_iov;
-    sockaddr_can m_addr;
-    char m_ctrlmsg[CMSG_SPACE(sizeof(timeval)) + CMSG_SPACE(sizeof(__u32))];
-
-    qint64 canSocket = -1;
-    QSocketNotifier *readNotifier = nullptr;
-    QSocketNotifier *writeNotifier = nullptr;
-    QString canSocketName;
-    bool canFdOptionEnabled = false;
+    QString name;
+    QString description;
+    QString serialNumber;
+    int  channel = 0;
+    bool hasFlexibleDataRate = false;
+    bool isVirtual = false;
 };
 
 QT_END_NAMESPACE
 
-#endif // SOCKETCANBACKEND_H
+#endif // QCANBUSDEVICEINFO_P_H

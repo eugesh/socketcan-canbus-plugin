@@ -1,10 +1,11 @@
-#include <QtCore/qscopedpointer.h>
-#include <QtCore/qtimer.h>
-#include <QtTest/qsignalspy.h>
-#include <QtTest/qtest.h>
-#include "socketcanbackend_v2.h"
+#include <QCoreApplication>
+#include <QObject>
+#include <iostream>
 #include "can_test_common.h"
+#include "socketcanbackend_v2.h"
+#include <QtCore/qtimer.h>
 #include <unistd.h>
+
 
 #define LONG_MSG_TEST_NUM_LOOP 500
 
@@ -14,7 +15,7 @@ class tst_QCanBus : public QObject
 public:
     explicit tst_QCanBus();
 
-private slots:
+public slots:
     void initTestCase();
     // void conf();
     // Write long UniCAN message.
@@ -73,7 +74,7 @@ void tst_QCanBus::floodTrafficWrite() {
         QString data = QString("E0FF");
         const QByteArray payload = QByteArray::fromHex(data.toLatin1());
 
-        // qInfo() << frameId << "#" << data;
+        qInfo() << frameId << "#" << data;
 
         QCanBusFrame frame = QCanBusFrame(frameId, payload);
         // frame.setExtendedFrameFormat(false);
@@ -119,7 +120,7 @@ void tst_QCanBus::longUniCANWrite() {
             for (int i = 0; i < len; ++i)
                 payload.append(QByteArray::fromHex(fields[3 + i]));
 
-            // qInfo () << canId << " [" << len << "] " << payload;
+            // qDebug() << canId << " [" << len << "] " << payload;
 
             QCanBusFrame frame = QCanBusFrame(canId, payload);
 
@@ -129,6 +130,17 @@ void tst_QCanBus::longUniCANWrite() {
     }
 }
 
-QTEST_MAIN(tst_QCanBus)
+int main(int argc, char *argv[])
+{
+    QCoreApplication a(argc, argv);
 
-#include "write_test.moc"
+    tst_QCanBus test;
+
+    test.initTestCase();
+    // test.floodTrafficWrite();
+    test.longUniCANWrite();
+
+    return a.exec();
+}
+
+#include "main.moc"

@@ -38,8 +38,6 @@
 #include "qcanbusdevice_v2_p.h"
 #include "qcanbusdeviceinfo_p.h"
 
-#include "qcanbusframe.h"
-
 #include <QtCore/qdebug.h>
 #include <QtCore/qdatastream.h>
 #include <QtCore/qeventloop.h>

@@ -34,69 +34,36 @@
 **
 ****************************************************************************/
 
-#ifndef SOCKETCANBACKEND_H
-#define SOCKETCANBACKEND_H
+#ifndef QCANBUS_H
+#define QCANBUS_H
 
-//#include <QtSerialBus/qcanbusframe.h>
-#include "qcanbusframe_v2.h"
-#include "qcanbusdevice_v2.h"
-//#include <QtSerialBus/qcanbusdeviceinfo.h>
-#include "qcanbusdeviceinfo_v2.h"
-
-#include <QtCore/qsocketnotifier.h>
-#include <QtCore/qstring.h>
-#include <QtCore/qvariant.h>
-
-// The order of the following includes is mandatory, because some
-// distributions use sa_family_t in can.h without including socket.h
-#include <sys/socket.h>
-#include <sys/uio.h>
-#include <linux/can.h>
-#include <sys/time.h>
+#include <QtCore/qobject.h>
+#include <QtSerialBus/qserialbusglobal.h>
+#include <QtSerialBus/qcanbusdevice.h>
+#include <QtSerialBus/qcanbusdeviceinfo.h>
 
 QT_BEGIN_NAMESPACE
 
-class SocketCanBackend_v2 : public QCanBusDevice
+class Q_SERIALBUS_EXPORT QCanBus : public QObject
 {
     Q_OBJECT
+
 public:
-    explicit SocketCanBackend_v2(const QString &name);
-    ~SocketCanBackend_v2();
+    static QCanBus *instance();
+    QStringList plugins() const;
 
-    bool open() override;
-    void close() override;
+    QList<QCanBusDeviceInfo> availableDevices(const QString &plugin, QString *errorMessage = nullptr) const;
 
-    void setConfigurationParameter(int key, const QVariant &value) override;
-
-    bool writeFrame(const QCanBusFrame &newData) override;
-
-    QString interpretErrorFrame(const QCanBusFrame &errorFrame) override;
-
-    static QList<QCanBusDeviceInfo> interfaces();
-
-private Q_SLOTS:
-    void readSocket();
-    void writeSocket(int socket);
+    QCanBusDevice *createDevice(const QString &plugin,
+                                const QString &interfaceName,
+                                QString *errorMessage = nullptr) const;
 
 private:
-    void resetConfigurations();
-    bool connectSocket();
-    bool applyConfigurationParameter(int key, const QVariant &value);
+    QCanBus(QObject *parent = nullptr);
 
-    canfd_frame m_frame;
-    sockaddr_can m_address;
-    msghdr m_msg;
-    iovec m_iov;
-    sockaddr_can m_addr;
-    char m_ctrlmsg[CMSG_SPACE(sizeof(timeval)) + CMSG_SPACE(sizeof(__u32))];
-
-    qint64 canSocket = -1;
-    QSocketNotifier *readNotifier = nullptr;
-    QSocketNotifier *writeNotifier = nullptr;
-    QString canSocketName;
-    bool canFdOptionEnabled = false;
+    Q_DISABLE_COPY(QCanBus)
 };
 
 QT_END_NAMESPACE
 
-#endif // SOCKETCANBACKEND_H
+#endif // QSERIALBUS_H

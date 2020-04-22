@@ -3,9 +3,12 @@
 
 // #include <QtSerialBus/qcanbusdevice.h>
 #include "qcanbusdevice_v2.h"
-#include <QtSerialBus/qcanbusframe.h>
-#include <QtSerialBus/qcanbus.h>
-#include <QtSerialBus/qcanbusfactory.h>
+// #include <QtSerialBus/qcanbusframe.h>
+#include "qcanbusframe_v2.h"
+// #include <QtSerialBus/qcanbus.h>
+#include "qcanbus_v2.h"
+// #include <QtSerialBus/qcanbusfactory.h>
+#include "qcanbusfactory_v2.h"
 #include <QString>
 #include <QtTest/qtest.h>
 

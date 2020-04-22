@@ -42,7 +42,6 @@
 #include <QtCore/qfile.h>
 #include <QtCore/qloggingcategory.h>
 #include <QtCore/qscopeguard.h>
-#include <QtCore/qsocketnotifier.h>
 
 #include <linux/can/error.h>
 #include <linux/can/raw.h>
@@ -436,13 +435,16 @@ bool SocketCanBackend_v2::connectSocket()
 
     delete readNotifier;
     delete writeNotifier;
+
     readNotifier = new QSocketNotifier(canSocket, QSocketNotifier::Read, this);
     connect(readNotifier, &QSocketNotifier::activated, this, &SocketCanBackend_v2::readSocket);
 
     writeNotifier = new QSocketNotifier(canSocket, QSocketNotifier::Write, this);
-
     connect(writeNotifier, &QSocketNotifier::activated, this, &SocketCanBackend_v2::writeSocket);
-    //apply all stored configurations
+    //static QMetaObject::Connection connw =
+            //connect(writeNotifier, SIGNAL(activated(int)), this, SLOT(writeSocket(int)));
+
+    // Apply all stored configurations.
     const auto keys = configurationKeys();
     for (int key : keys) {
         const QVariant param = configurationParameter(key);
@@ -499,6 +501,7 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
 {
     if (state() != ConnectedState)
         return false;
+
     if (Q_UNLIKELY(!newData.isValid())) {
         setError(tr("Cannot write invalid QCanBusFrame"), QCanBusDevice::WriteError);
         return false;
@@ -509,7 +512,7 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
     return true;
 }
 
-void SocketCanBackend_v2::writeSocket()
+void SocketCanBackend_v2::writeSocket(int socket)
 {
     writeNotifier->setEnabled(false);
     auto enableWriteNotifier = qScopeGuard([this] {
@@ -540,6 +543,7 @@ void SocketCanBackend_v2::writeSocket()
         }
 
         qint64 bytesWritten = 0;
+        qint64 bytesMustBeWritten = 0;
         if (newData.hasFlexibleDataRateFormat()) {
             canfd_frame frame = {};
             frame.len = newData.payload().size();
@@ -548,6 +552,7 @@ void SocketCanBackend_v2::writeSocket()
             frame.flags |= newData.hasErrorStateIndicator() ? CANFD_ESI : 0;
             ::memcpy(frame.data, newData.payload().constData(), frame.len);
 
+            bytesMustBeWritten = sizeof(frame);
             bytesWritten = ::write(canSocket, &frame, sizeof(frame));
         } else {
             can_frame frame = {};
@@ -555,10 +560,11 @@ void SocketCanBackend_v2::writeSocket()
             frame.can_id = canId;
             ::memcpy(frame.data, newData.payload().constData(), frame.can_dlc);
 
+            bytesMustBeWritten = sizeof(frame);
             bytesWritten = ::write(canSocket, &frame, sizeof(frame));
         }
 
-        if (Q_UNLIKELY(bytesWritten < 0)) {
+        if (Q_UNLIKELY(bytesWritten < bytesMustBeWritten)) {
             if (Q_UNLIKELY(errno != ENOBUFS && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)) {
                 setError(qt_error_string(errno),
                          QCanBusDevice::CanBusError::WriteError);

@@ -47,4 +47,10 @@ qtserialbus-config.pri
 *.vcxproj.user
 *.sdf
 *.opensdf
+CMakeFiles
+*_automoc.cpp
+*.cmake
+*/bin/*
+*.moc
+CMakeCache.txt
 

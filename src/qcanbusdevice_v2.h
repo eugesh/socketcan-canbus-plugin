@@ -38,8 +38,10 @@
 #define QCANBUSDEVICE_H
 
 #include <QtCore/qobject.h>
-#include <QtSerialBus/qcanbusframe.h>
-#include <QtSerialBus/qcanbusdeviceinfo.h>
+//#include <QtSerialBus/qcanbusframe.h>
+//#include <QtSerialBus/qcanbusdeviceinfo.h>
+#include "qcanbusframe_v2.h"
+#include "qcanbusdeviceinfo_v2.h"
 
 QT_BEGIN_NAMESPACE
 
