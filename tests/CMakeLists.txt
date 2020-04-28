@@ -33,8 +33,6 @@ find_package(Qt5 COMPONENTS Network Core Test REQUIRED) #SerialBus
 #SET(Qt5SerialBus_DIR QT_PATH/lib/cmake/Qt5SerialBus)
 SET(Qt5Core_DIR QT_PATH/lib/cmake/Qt5Core)
 SET(Qt5Test_DIR QT_PATH/lib/cmake/Qt5Core)
-#qt5_wrap_ui (UI_HEADERS unicanserver.ui)
-#qt5_add_resources (QRCS resources/pics.qrc)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)

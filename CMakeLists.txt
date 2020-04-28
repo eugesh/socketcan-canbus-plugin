@@ -28,13 +28,10 @@ endif ()
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
 
-find_package(Qt5 COMPONENTS PrintSupport Network Widgets REQUIRED) #SerialBus
+find_package(Qt5 COMPONENTS Core REQUIRED) #SerialBus
 
 #SET(Qt5SerialBus_DIR QT_PATH/lib/cmake/Qt5SerialBus)
-SET(Qt5PrintSupport_DIR QT_PATH/lib/cmake/Qt5PrintSupport)
 SET(Qt5Core_DIR QT_PATH/lib/cmake/Qt5Core)
-#qt5_wrap_ui (UI_HEADERS unicanserver.ui)
-#qt5_add_resources (QRCS resources/pics.qrc)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -45,7 +42,6 @@ include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/src")
 include_directories (${Qt5Core_PRIVATE_INCLUDE_DIRS})
 
 add_definitions (-DG_LOG_DOMAIN="HoustonServerPlugin")
-
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -62,5 +58,4 @@ add_library (qtsocketcanbus_v2 SHARED
              src/qcanbusfactory_v2.cpp
              ${MOCSrcs})
 
-         target_link_libraries(qtsocketcanbus_v2 Qt5::Core Qt5::Network)# Qt5::SerialBus)
-
+target_link_libraries(qtsocketcanbus_v2 Qt5::Core)# Qt5::SerialBus)
