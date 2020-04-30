@@ -564,12 +564,14 @@ void SocketCanBackend_v2::writeSocket(int socket)
             bytesWritten = ::write(canSocket, &frame, sizeof(frame));
         }
 
-        if (Q_UNLIKELY(bytesWritten < bytesMustBeWritten)) {
+        if (Q_UNLIKELY(bytesWritten == -1)) {
             if (Q_UNLIKELY(errno != ENOBUFS && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)) {
                 setError(qt_error_string(errno),
                          QCanBusDevice::CanBusError::WriteError);
                 dequeueOutgoingFrame();
             }
+            return;
+        } else if (bytesWritten < bytesMustBeWritten) {
             return;
         }
         dequeueOutgoingFrame();
