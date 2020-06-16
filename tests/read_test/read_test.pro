@@ -1,5 +1,6 @@
 QT -= gui
 QT = core testlib serialbus
+QT += core-private
 TARGET = read_test
 CONFIG += testcase
 
@@ -23,8 +24,18 @@ INCLUDEPATH += $$PWD/../
 
 HEADERS += \
            $$PWD/../../src/socketcanbackend_v2.h \
-           ../can_test_common.h
+           ../can_test_common.h \
+           ../../src/qcanbusdevice_v2.h \
+           ../../src/qcanbusframe_v2.h \
+           ../../src/qcanbus_v2.h \
+           ../../src/qcanbusdeviceinfo_v2.h \
+           ../../src/qcanbusfactory_v2.h
 
 SOURCES += \
-        main.cpp \
-        ../../src/socketcanbackend_v2.cpp
+           main.cpp \
+           ../../src/socketcanbackend_v2.cpp \
+           ../../src/qcanbusdevice_v2.cpp \
+           ../../src/qcanbusframe_v2.cpp \
+           ../../src/qcanbus_v2.cpp \
+           ../../src/qcanbusdeviceinfo_v2.cpp \
+           ../../src/qcanbusfactory_v2.cpp

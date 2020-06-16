@@ -58,4 +58,4 @@ add_library (qtsocketcanbus_v2 SHARED
              src/qcanbusfactory_v2.cpp
              ${MOCSrcs})
 
-target_link_libraries(qtsocketcanbus_v2 Qt5::Core)# Qt5::SerialBus)
+target_link_libraries(qtsocketcanbus_v2 Qt5::Core)

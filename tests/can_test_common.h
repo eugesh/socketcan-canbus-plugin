@@ -2,12 +2,12 @@
 #define CAN_TEST_COMMON_H
 
 // #include <QtSerialBus/qcanbusdevice.h>
-#include "qcanbusdevice_v2.h"
 // #include <QtSerialBus/qcanbusframe.h>
-#include "qcanbusframe_v2.h"
 // #include <QtSerialBus/qcanbus.h>
-#include "qcanbus_v2.h"
 // #include <QtSerialBus/qcanbusfactory.h>
+#include "qcanbusdevice_v2.h"
+#include "qcanbusframe_v2.h"
+#include "qcanbus_v2.h"
 #include "qcanbusfactory_v2.h"
 #include <QString>
 #include <QtTest/qtest.h>
