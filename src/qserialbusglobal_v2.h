@@ -34,36 +34,23 @@
 **
 ****************************************************************************/
 
-#ifndef QCANBUS_H
-#define QCANBUS_H
+#ifndef QSERIALBUSGLOBAL_H
+#define QSERIALBUSGLOBAL_H
 
-#include <QtCore/qobject.h>
-#include <qserialbusglobal_v2.h>
-#include <qcanbusdevice_v2.h>
-#include <qcanbusdeviceinfo_v2.h>
+#include <QtCore/qglobal.h>
 
 QT_BEGIN_NAMESPACE
 
-class Q_SERIALBUS_EXPORT QCanBus : public QObject
-{
-    Q_OBJECT
-
-public:
-    static QCanBus *instance();
-    QStringList plugins() const;
-
-    QList<QCanBusDeviceInfo> availableDevices(const QString &plugin, QString *errorMessage = nullptr) const;
-
-    QCanBusDevice *createDevice(const QString &plugin,
-                                const QString &interfaceName,
-                                QString *errorMessage = nullptr) const;
-
-private:
-    QCanBus(QObject *parent = nullptr);
-
-    Q_DISABLE_COPY(QCanBus)
-};
+#ifndef QT_STATIC
+#  if defined(QT_BUILD_SERIALBUS_LIB)
+#    define Q_SERIALBUS_EXPORT Q_DECL_EXPORT
+#  else
+#    define Q_SERIALBUS_EXPORT Q_DECL_IMPORT
+#  endif
+#else
+#  define Q_SERIALBUS_EXPORT
+#endif
 
 QT_END_NAMESPACE
 
-#endif // QSERIALBUS_H
+#endif // QSERIALBUSGLOBAL_H

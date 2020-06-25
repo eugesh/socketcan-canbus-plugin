@@ -39,7 +39,7 @@
 
 #include <QtCore/qshareddata.h>
 #include <QtCore/qstring.h>
-#include <QtSerialBus/qserialbusglobal.h>
+#include <qserialbusglobal_v2.h>
 
 QT_BEGIN_NAMESPACE
 

@@ -38,9 +38,9 @@
 #define QCANBUSFACTORY_H
 
 #include <QtCore/qstringlist.h>
-#include <QtSerialBus/qserialbusglobal.h>
-#include <QtSerialBus/qcanbusdevice.h>
-#include <QtSerialBus/qcanbusdeviceinfo.h>
+#include <qserialbusglobal_v2.h>
+#include <qcanbusdevice_v2.h>
+#include <qcanbusdeviceinfo_v2.h>
 
 QT_BEGIN_NAMESPACE
 

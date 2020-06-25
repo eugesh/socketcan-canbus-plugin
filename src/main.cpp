@@ -36,9 +36,9 @@
 
 #include "socketcanbackend_v2.h"
 
-#include <QtSerialBus/qcanbus.h>
-#include <QtSerialBus/qcanbusdevice.h>
-#include <QtSerialBus/qcanbusfactory.h>
+#include <qcanbus_v2.h>
+#include <qcanbusdevice_v2.h>
+#include <qcanbusfactory_v2.h>
 
 #include <QtCore/qloggingcategory.h>
 
