@@ -1,5 +1,5 @@
 QT -= gui
-QT = core testlib serialbus
+QT = core testlib #serialbus
 QT += core-private
 TARGET = read_test
 CONFIG += testcase
