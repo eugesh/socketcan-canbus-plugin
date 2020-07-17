@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 
-#define LONG_MSG_TEST_NUM_LOOP 500
+#define LONG_MSG_TEST_NUM_LOOP 50000
 
 class tst_QCanBus : public QObject
 {
@@ -90,7 +90,46 @@ void tst_QCanBus::floodTrafficWrite() {
     }
 }
 
-void tst_QCanBus::longUniCANWrite() {
+QList<QCanBusFrame>
+read_long_file(QString const& path) {
+    QList<QCanBusFrame> frames;
+
+    QFile file(path);
+
+    if (!file.open(QFile::ReadOnly)) {
+        QString msg = QString("Failed to open %1\n%2")
+                             .arg(path)
+                             .arg(file.errorString());
+        qWarning() << QString("Error") + msg;
+        return QList<QCanBusFrame>();
+    }
+
+    while (!file.atEnd()) {
+        QByteArray line = file.readLine().simplified();
+
+        auto fields = line.split(' ');
+
+        int canId = fields[1].toUInt(nullptr, 16);
+        QByteArray len_arr = fields[2];
+        len_arr.replace('[', "");
+        len_arr.replace(']', "");
+        int len = len_arr.toUInt();
+        QByteArray payload;
+
+        for (int i = 0; i < len; ++i)
+            payload.append(QByteArray::fromHex(fields[3 + i]));
+
+        // qDebug() << canId << " [" << len << "] " << payload;
+
+        QCanBusFrame frame = QCanBusFrame(canId, payload);
+
+        frames << frame;
+    }
+
+    return frames;
+}
+
+/*void tst_QCanBus::longUniCANWrite() {
     // Name of file with long message
     QString test_file = "long_CAN.txt";
 
@@ -125,6 +164,20 @@ void tst_QCanBus::longUniCANWrite() {
             QCanBusFrame frame = QCanBusFrame(canId, payload);
 
             QVERIFY(m_canDevice->writeFrame(frame));
+            // usleep(1);
+        }
+    }
+}*/
+
+void tst_QCanBus::longUniCANWrite() {
+    // Name of file with long message
+    QString test_file = "long_CAN.txt";
+
+    QList<QCanBusFrame> frames = read_long_file(test_file);
+
+    for (int k = 0; k < LONG_MSG_TEST_NUM_LOOP; k++) {
+        for (int n = 0; n < frames.count(); ++n) {
+            QVERIFY(m_canDevice->writeFrame(frames[n]));
             // usleep(1);
         }
     }
