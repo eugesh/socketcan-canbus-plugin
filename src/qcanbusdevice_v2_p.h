@@ -70,7 +70,7 @@ public:
 
     QVector<QCanBusFrame> incomingFrames;
     QMutex incomingFramesGuard;
-    QVector<QCanBusFrame> outgoingFrames;
+    QList<QCanBusFrame> outgoingFrames;
     QVector<ConfigEntry> configOptions;
 
     bool waitForReceivedEntered = false;
