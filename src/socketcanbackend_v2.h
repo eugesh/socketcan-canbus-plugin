@@ -76,7 +76,7 @@ public:
 
 private Q_SLOTS:
     void readSocket();
-    void writeSocket(int socket);
+    void writeSocket();
 
 private:
     void resetConfigurations();

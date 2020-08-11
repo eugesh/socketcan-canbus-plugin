@@ -512,7 +512,7 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
     return true;
 }
 
-void SocketCanBackend_v2::writeSocket(int socket)
+void SocketCanBackend_v2::writeSocket()
 {
     writeNotifier->setEnabled(false);
     auto enableWriteNotifier = qScopeGuard([this] {
@@ -572,6 +572,9 @@ void SocketCanBackend_v2::writeSocket(int socket)
             }
             return;
         } else if (bytesWritten < bytesMustBeWritten) {
+            qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "write: incomplete CAN frame."); // According to cangen implementation
+            setError(qt_error_string(errno), QCanBusDevice::CanBusError::WriteError);
+            dequeueOutgoingFrame();
             return;
         }
         dequeueOutgoingFrame();
