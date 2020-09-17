@@ -62,12 +62,14 @@ private slots:
     //void constructByName();
     void interfaces();
     void createDevice();
-    void createDevice2();
-    void ReadWriteLoop();
+
     void ReadWriteLoop2();
 
 protected slots:
 
+private:
+    void createDevice2();
+    void ReadWriteLoop();
 
 private:
     QString m_senderPortName;
@@ -87,9 +89,9 @@ tst_QSerialBus::tst_QSerialBus() {
 
 }
 
-class ReadWriteTest {
+class ReadWriteTest : public QObject {
     Q_OBJECT
-    void ReadWriteTest();
+    ReadWriteTest();
 private slots:
     void onframesWritten();
 };
