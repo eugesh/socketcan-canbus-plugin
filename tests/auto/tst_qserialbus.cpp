@@ -24,6 +24,8 @@ Q_DECLARE_METATYPE(QIODevice::OpenMode);
 Q_DECLARE_METATYPE(QIODevice::OpenModeFlag);
 Q_DECLARE_METATYPE(Qt::ConnectionType);
 
+#define BIGN 100500
+
 class tst_QSerialBus : public QObject
 {
     Q_OBJECT
@@ -61,6 +63,7 @@ private slots:
     void interfaces();
     void createDevice();
     void createDevice2();
+    void ReadWriteLoop();
 
 protected slots:
 
@@ -82,6 +85,46 @@ int tst_QSerialBus::loopLevel = 0;
 tst_QSerialBus::tst_QSerialBus() {
 
 }
+
+class ReadWriteTest {
+    Q_OBJECT
+    void ReadWriteTest();
+private slots:
+    void onframesWritten();
+};
+
+ReadWriteTest::ReadWriteTest() {
+
+}
+
+void
+ReadWriteTest::onframesWritten() {
+    tst_QSerialBus::exitLoop();
+}
+
+class AsyncReader : public QObject
+{
+    Q_OBJECT
+public:
+    explicit AsyncReader(QCanBusDevice * device, Qt::ConnectionType connectionType, int expectedFramesCount)
+        : m_device(device), m_expectedFramesCount(expectedFramesCount)
+    {
+        connect(device, &QCanBusDevice::framesReceived, this, &AsyncReader::receive, connectionType);
+    }
+
+private slots:
+    void receive()
+    {
+        if (m_device->framesAvailable() < expectedFramesCount)
+            return;
+
+        tst_QSerialBus::exitLoop();
+    }
+
+private:
+    QCanBusDevice * m_device;
+    const int m_expectedFramesCount;
+};
 
 void tst_QSerialBus::initTestCase() {
     m_senderPortName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
@@ -174,12 +217,12 @@ void tst_QSerialBus::createDevice2() {
         return;
     }
 
-    /*if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)
+    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)
         m_canDeviceR->connectDevice();
 
     if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)  {
         qCritical() << "Error: Read Socket wasn't initialized!";
-    }*/
+    }
 
     if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)
         m_canDeviceW->connectDevice();
@@ -202,6 +245,66 @@ void tst_QSerialBus::createDevice2() {
     }
 
     enterLoop(10000);
+}
+
+void
+tst_QSerialBus::ReadWriteLoop() {
+    m_receiverPortName = "slcan0";
+    m_senderPortName = "slcan0";
+    QCanBusDevice * m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
+    QCanBusDevice * m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
+
+    if (! m_canDeviceR || ! m_canDeviceW ) {
+        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
+        //qCritical() << errorString;
+        qInfo() << "Plugin: " << "socketcan" << "Port" << m_receiverPortName;
+        return;
+    }
+
+    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)
+        m_canDeviceR->connectDevice();
+
+    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)  {
+        qCritical() << "Error: Read Socket wasn't initialized!";
+    }
+
+    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)
+        m_canDeviceW->connectDevice();
+
+    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)  {
+        qCritical() << "Error: Write Socket wasn't initialized!";
+        return;
+    }
+
+    QCanBusFrame frameW;
+    frameW.setFrameId(123);
+    frameW.setPayload(QByteArray::fromHex("E0FF"));
+
+    qDebug() << frameW.toString();
+
+    for (int i=0; i < BIGN; ++i) {
+        m_canDeviceW->writeFrame(frameW);
+        enterLoop(1);
+
+        // qint64 n_r_frames = m_canDeviceR->framesAvailable();
+        while (m_canDeviceR->framesAvailable()) {
+            const QCanBusFrame frameR = m_canDeviceR->readFrame();
+
+            QString view;
+            if (frameR.frameType() == QCanBusFrame::ErrorFrame)
+                view = m_canDeviceR->interpretErrorFrame(frameR);
+            else
+                view = frameR.toString();
+
+            const QString time = QString::fromLatin1("%1.%2  ")
+                    .arg(frameR.timeStamp().seconds(), 10, 10, QLatin1Char(' '))
+                    .arg(frameR.timeStamp().microSeconds() / 100, 4, 10, QLatin1Char('0'));
+
+            // const QString flags = frameFlags(frameR);
+            qDebug() << frameR.toString();
+        }
+    }
+
 }
 
 /*bool
