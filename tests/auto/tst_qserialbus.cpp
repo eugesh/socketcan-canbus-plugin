@@ -130,6 +130,7 @@ private:
 };
 
 void tst_QSerialBus::initTestCase() {
+    qputenv("QTEST_FUNCTION_TIMEOUT", QByteArray("90000000"));
     m_senderPortName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
     m_receiverPortName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
     /*if (m_senderPortName.isEmpty() || m_receiverPortName.isEmpty()) {
@@ -284,7 +285,7 @@ tst_QSerialBus::ReadWriteLoop2() {
     frameW.setFrameId(123);
     frameW.setPayload(QByteArray::fromHex("E0FF"));
 
-    qDebug() << frameW.toString();
+    qInfo() << "Loop #" << tst_QSerialBus::loopLevel << ", Write: " << frameW.toString();
 
     for (int i=0; i < BIGN; ++i) {
         m_canDeviceW->writeFrame(frameW);
@@ -305,7 +306,7 @@ tst_QSerialBus::ReadWriteLoop2() {
                     .arg(frameR.timeStamp().microSeconds() / 100, 4, 10, QLatin1Char('0'));
 
             // const QString flags = frameFlags(frameR);
-            qDebug() << frameR.toString();
+            qInfo() << "Loop #" << tst_QSerialBus::loopLevel << ", Receive: " << frameR.toString();
         }
     }
 
