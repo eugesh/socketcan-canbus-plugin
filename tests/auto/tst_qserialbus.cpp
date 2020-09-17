@@ -64,6 +64,7 @@ private slots:
     void createDevice();
     void createDevice2();
     void ReadWriteLoop();
+    void ReadWriteLoop2();
 
 protected slots:
 
@@ -245,6 +246,67 @@ void tst_QSerialBus::createDevice2() {
     }
 
     enterLoop(10000);
+}
+
+void
+tst_QSerialBus::ReadWriteLoop2() {
+    m_receiverPortName = "slcan0";
+    m_senderPortName = "slcan0";
+    QCanBusDevice * m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
+    QCanBusDevice * m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
+    AsyncReader * areader = new AsyncReader(m_canDeviceR, Qt::ConnectionType::AutoConnection, 1);
+
+    if (! m_canDeviceR || ! m_canDeviceW ) {
+        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
+        //qCritical() << errorString;
+        qInfo() << "Plugin: " << "socketcan" << "Port" << m_receiverPortName;
+        return;
+    }
+
+    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)
+        m_canDeviceR->connectDevice();
+
+    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)  {
+        qCritical() << "Error: Read Socket wasn't initialized!";
+    }
+
+    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)
+        m_canDeviceW->connectDevice();
+
+    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)  {
+        qCritical() << "Error: Write Socket wasn't initialized!";
+        return;
+    }
+
+    QCanBusFrame frameW;
+    frameW.setFrameId(123);
+    frameW.setPayload(QByteArray::fromHex("E0FF"));
+
+    qDebug() << frameW.toString();
+
+    for (int i=0; i < BIGN; ++i) {
+        m_canDeviceW->writeFrame(frameW);
+        enterLoop(1);
+
+        // qint64 n_r_frames = m_canDeviceR->framesAvailable();
+        while (m_canDeviceR->framesAvailable()) {
+            const QCanBusFrame frameR = m_canDeviceR->readFrame();
+
+            QString view;
+            if (frameR.frameType() == QCanBusFrame::ErrorFrame)
+                view = m_canDeviceR->interpretErrorFrame(frameR);
+            else
+                view = frameR.toString();
+
+            const QString time = QString::fromLatin1("%1.%2  ")
+                    .arg(frameR.timeStamp().seconds(), 10, 10, QLatin1Char(' '))
+                    .arg(frameR.timeStamp().microSeconds() / 100, 4, 10, QLatin1Char('0'));
+
+            // const QString flags = frameFlags(frameR);
+            qDebug() << frameR.toString();
+        }
+    }
+
 }
 
 void
