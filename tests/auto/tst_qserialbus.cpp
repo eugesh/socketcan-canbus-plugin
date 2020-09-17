@@ -115,7 +115,7 @@ public:
 private slots:
     void receive()
     {
-        if (m_device->framesAvailable() < expectedFramesCount)
+        if (m_device->framesAvailable() < m_expectedFramesCount)
             return;
 
         tst_QSerialBus::exitLoop();
