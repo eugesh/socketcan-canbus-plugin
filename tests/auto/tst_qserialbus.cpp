@@ -60,7 +60,6 @@ public:
 private slots:
     void initTestCase();
     //void constructByName();
-    void interfaces();
     void createDevice();
 
     void ReadWriteLoop2();
@@ -68,6 +67,7 @@ private slots:
 protected slots:
 
 private:
+    void interfaces();
     void createDevice2();
     void ReadWriteLoop();
 
@@ -81,9 +81,6 @@ private:
 };
 
 int tst_QSerialBus::loopLevel = 0;
-
-//const QByteArray tst_QSerialBus::alphabetArray("ABCDEFGHIJKLMNOPQRSTUVWXUZ");
-//const QByteArray tst_QSerialBus::newlineArray("\n\r");
 
 tst_QSerialBus::tst_QSerialBus() {
 
@@ -133,7 +130,7 @@ void tst_QSerialBus::initTestCase() {
     qputenv("QTEST_FUNCTION_TIMEOUT", QByteArray("90000000"));
     m_senderPortName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
     m_receiverPortName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
-    /*if (m_senderPortName.isEmpty() || m_receiverPortName.isEmpty()) {
+    if (m_senderPortName.isEmpty() || m_receiverPortName.isEmpty()) {
         static const char message[] =
               "Test doesn't work because the names of CAN ports aren't found in env.\n"
               "Please set environment variables:\n"
@@ -151,7 +148,7 @@ void tst_QSerialBus::initTestCase() {
         QSKIP(message);
     } else {
         m_availablePortNames << m_senderPortName << m_receiverPortName;
-    }*/
+    }
 
     qDebug() << "m_senderPortName = " << m_senderPortName;
     qDebug() << "m_receiverPortName = " << m_receiverPortName;
@@ -253,15 +250,17 @@ void tst_QSerialBus::createDevice2() {
 
 void
 tst_QSerialBus::ReadWriteLoop2() {
-    m_receiverPortName = "slcan0";
-    m_senderPortName = "slcan0";
+    // m_receiverPortName = "slcan0";
+    // m_senderPortName = "slcan0";
+    long unsigned int read_count = 0;
+    long unsigned int write_count = 0;
+
     QCanBusDevice * m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
     QCanBusDevice * m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
     AsyncReader * areader = new AsyncReader(m_canDeviceR, Qt::ConnectionType::AutoConnection, 1);
 
     if (! m_canDeviceR || ! m_canDeviceW ) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
-        //qCritical() << errorString;
         qInfo() << "Plugin: " << "socketcan" << "Port" << m_receiverPortName;
         return;
     }
@@ -289,11 +288,15 @@ tst_QSerialBus::ReadWriteLoop2() {
 
     for (int i=0; i < BIGN; ++i) {
         m_canDeviceW->writeFrame(frameW);
+        write_count++;
         enterLoop(1);
 
-        // qint64 n_r_frames = m_canDeviceR->framesAvailable();
         while (m_canDeviceR->framesAvailable()) {
             const QCanBusFrame frameR = m_canDeviceR->readFrame();
+            // QVERIFY(frameR.payload().length() == frameW.payload().length());
+            if (Q_UNLIKELY(frameR.payload().length() != frameW.payload().length()))
+                QSKIP("bad dlc!");
+            read_count++;
 
             QString view;
             if (frameR.frameType() == QCanBusFrame::ErrorFrame)
@@ -306,10 +309,12 @@ tst_QSerialBus::ReadWriteLoop2() {
                     .arg(frameR.timeStamp().microSeconds() / 100, 4, 10, QLatin1Char('0'));
 
             // const QString flags = frameFlags(frameR);
-            qInfo() << "Loop #" << tst_QSerialBus::loopLevel << ", Receive: " << frameR.toString();
+            //qInfo() << "Loop #" << tst_QSerialBus::loopLevel << ", Receive: " << frameR.toString();
         }
     }
-
+    qInfo() << "write_count = " << write_count;
+    qInfo() << "read_count = " << read_count;
+    QVERIFY (write_count == read_count);
 }
 
 void
@@ -371,35 +376,6 @@ tst_QSerialBus::ReadWriteLoop() {
     }
 
 }
-
-/*bool
-QSocketCAN_connector::createDevice(QString const& plugin) {
-    QString errorString;
-    if (plugin.contains("virtualcan", Qt::CaseInsensitive)) {
-        m_canDevice = QCanBus::instance()->createDevice(plugin, m_CANsocket_name, &errorString);
-    }
-#ifndef WIN32
-    else if (plugin.contains("socketcan", Qt::CaseInsensitive)) {
-        m_canDevice = new SocketCanBackend_v2(m_CANsocket_name);
-    }
-#endif
-
-    if (! m_canDevice) {
-        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
-        qCritical() << errorString;
-        qInfo() << "Plugin: " << m_CAN_device_plugin_name << "Port" << m_CANsocket_name;
-        changeState(AbstractConnector::HW_NOTINIT);
-        return false;
-    }
-
-    connect(m_canDevice, &QCanBusDevice::errorOccurred, this, &QSocketCAN_connector::processErrors);
-    connect(m_canDevice, &QCanBusDevice::framesReceived, this, &QSocketCAN_connector::processReceivedFrames);
-    connect(m_canDevice, &QCanBusDevice::framesWritten, this, &QSocketCAN_connector::processFramesWritten);
-    connect(m_canDevice, &QObject::destroyed, this, &QSocketCAN_connector::on_destroyed);
-    connect(m_canDevice, &QCanBusDevice::stateChanged, this, &QSocketCAN_connector::on_stateChanged);
-
-    return true;
-}*/
 
 QTEST_MAIN(tst_QSerialBus)
 
