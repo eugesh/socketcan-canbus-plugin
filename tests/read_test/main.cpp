@@ -164,31 +164,7 @@ void tst_QCanBusRead::processReceivedFrames() {
         int m_bytesCount = frame.toString().count();
         m_rxCount++;
 
-        /*message.can_extbit = frame.hasExtendedFrameFormat();
-
-        if (message.can_extbit) {
-            message.can_identifier = frame.frameId() & CAN_EFF_MASK;
-        }
-        else {
-            message.can_identifier = frame.frameId() & CAN_SFF_MASK;
-        }
-
-        // message.can_rtr = (frame.frameId() & CAN_RTR_FLAG) >> 30;
-        if (frame.frameType() == QCanBusFrame::RemoteRequestFrame)
-            message.can_rtr = 1;
-        else
-            message.can_rtr = 0;
-
-        message.can_dlc = frame.payload().count();
-
-        for (int data_index = 0; data_index < frame.payload().count(); data_index++){
-            message.data[data_index] = frame.payload()[data_index];
-        }
-
-        can_receive_message(&message);
-
-        emit can_message_ready(message);*/
-        qInfo() << m_rxCount << frame.toString(); //QString::number(frame.frameId(), 16) << "#" << QString(frame.payload());
+        qInfo() << m_rxCount << frame.toString();
     }
 }
 
@@ -198,8 +174,8 @@ int main(int argc, char *argv[])
 
     tst_QCanBusRead test;
 
-    // test.listen_can();
-    test.listen_long_can();
+    test.listen_can();
+    // test.listen_long_can();
 
     return a.exec();
 }
