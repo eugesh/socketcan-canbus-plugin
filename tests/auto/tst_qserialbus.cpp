@@ -1,11 +1,13 @@
 #include <QtTest/QtTest>
-/*#include <QtSerialBus/qcanbusframe.h>
+#define USE_LOCAL_PLUGIN 1
+
+#ifndef USE_LOCAL_PLUGIN
+#include <QtSerialBus/qcanbusframe.h>
 #include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbusdeviceinfo.h>
-#include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbus.h>
-#include <QtSerialBus/qcanbusfactory.h>*/
-
+#include <QtSerialBus/qcanbusfactory.h>
+#else
 #ifndef WIN32
 #include "socketcanbackend_v2.h"
 #include "qcanbusframe_v2.h"
@@ -17,7 +19,7 @@
 #include <QCanBusFrame>
 #include <QCanBus>
 #endif
-
+#endif
 #include <QThread>
 
 Q_DECLARE_METATYPE(QIODevice::OpenMode);
@@ -138,12 +140,19 @@ void tst_QSerialBus::initTestCase() {
 
 void tst_QSerialBus::createDevice()
 {
-    m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
-    m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
+    QString errorString;
+
+#ifdef WIN32
+    m_canDeviceR = QCanBus::instance()->createDevice("virtualcan", m_receiverPortName, &errorString);
+    m_canDeviceW = QCanBus::instance()->createDevice("virtualcan", m_senderPortName, &errorString);
+#else
+    m_canDeviceR = QCanBus::instance()->createDevice("socketcan", m_receiverPortName, &errorString);
+    m_canDeviceW = QCanBus::instance()->createDevice("socketcan", m_senderPortName, &errorString);
+#endif
     QVERIFY (m_canDeviceR && m_canDeviceW);
 
     if (! m_canDeviceR || ! m_canDeviceW ) {
-        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
+        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
         qInfo() << "Plugin: " << "socketcan" << "Port" << m_receiverPortName;
         return;
     }
