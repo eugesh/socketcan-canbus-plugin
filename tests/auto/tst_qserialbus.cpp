@@ -59,9 +59,7 @@ public:
 
 private slots:
     void initTestCase();
-    //void constructByName();
     void createDevice();
-
     void ReadWriteLoop2();
 
 protected slots:
@@ -75,6 +73,8 @@ private:
     QString m_senderPortName;
     QString m_receiverPortName;
     QStringList m_availablePortNames;
+    QCanBusDevice * m_canDeviceR;
+    QCanBusDevice * m_canDeviceW;
 
     static int loopLevel;
     QCanBus *bus = nullptr;
@@ -159,14 +159,6 @@ void tst_QSerialBus::initTestCase() {
     QCOMPARE(bus, sameInstance);
 }
 
-/*void tst_QSerialBus::constructByName()
-{
-    /*QSerialBus serialPort(m_senderPortName);
-    QCOMPARE(serialPort.portName(), m_senderPortName);
-    serialPort.setPortName(m_receiverPortName);
-    QCOMPARE(serialPort.portName(), m_receiverPortName);*//*
-}*/
-
 void tst_QSerialBus::interfaces()
 {
     // Plugins derived from QCanBusFactory(V1) don't have availableDevices()
@@ -182,27 +174,32 @@ void tst_QSerialBus::interfaces()
 
 void tst_QSerialBus::createDevice()
 {
-    /*// Assure we can still create plugins derived from QCanBusFactory(V1)
-    QCanBusDevice *dummyV1 = bus->createDevice("genericv1", "unused");
-    QVERIFY(dummyV1);
-    delete dummyV1;
+    m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
+    m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
+    AsyncReader * areader = new AsyncReader(m_canDeviceR, Qt::ConnectionType::AutoConnection, 1);
 
-    QString error, error2;
-    QCanBusDevice *dummy = bus->createDevice("generic", "unused");
-    QCanBusDevice *dummy2 = bus->createDevice("generic", "unused");
-    QCanBusDevice *faulty = bus->createDevice("generic", "invalid", &error);
-    QCanBusDevice *faulty2 = bus->createDevice("faulty", "faulty", &error2);
-    QVERIFY(dummy);
-    QVERIFY(dummy2);
+    QVERIFY (m_canDeviceR && m_canDeviceW);
 
-    QVERIFY(!faulty);
-    QCOMPARE(error, tr("No such interface: 'invalid'"));
+    if (! m_canDeviceR || ! m_canDeviceW ) {
+        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
+        qInfo() << "Plugin: " << "socketcan" << "Port" << m_receiverPortName;
+        return;
+    }
 
-    QVERIFY(!faulty2);
-    QCOMPARE(error2, tr("No such plugin: 'faulty'"));
+    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)
+        m_canDeviceR->connectDevice();
 
-    delete dummy;
-    delete dummy2;*/
+    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)  {
+        qCritical() << "Error: Read Socket wasn't initialized!";
+    }
+
+    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)
+        m_canDeviceW->connectDevice();
+
+    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)  {
+        qCritical() << "Error: Write Socket wasn't initialized!";
+        return;
+    }
 }
 
 void tst_QSerialBus::createDevice2() {
@@ -250,35 +247,10 @@ void tst_QSerialBus::createDevice2() {
 
 void
 tst_QSerialBus::ReadWriteLoop2() {
-    // m_receiverPortName = "slcan0";
-    // m_senderPortName = "slcan0";
     long unsigned int read_count = 0;
     long unsigned int write_count = 0;
 
-    QCanBusDevice * m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
-    QCanBusDevice * m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
     AsyncReader * areader = new AsyncReader(m_canDeviceR, Qt::ConnectionType::AutoConnection, 1);
-
-    if (! m_canDeviceR || ! m_canDeviceW ) {
-        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized!";
-        qInfo() << "Plugin: " << "socketcan" << "Port" << m_receiverPortName;
-        return;
-    }
-
-    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)
-        m_canDeviceR->connectDevice();
-
-    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)  {
-        qCritical() << "Error: Read Socket wasn't initialized!";
-    }
-
-    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)
-        m_canDeviceW->connectDevice();
-
-    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)  {
-        qCritical() << "Error: Write Socket wasn't initialized!";
-        return;
-    }
 
     QCanBusFrame frameW;
     frameW.setFrameId(123);
@@ -295,7 +267,7 @@ tst_QSerialBus::ReadWriteLoop2() {
             const QCanBusFrame frameR = m_canDeviceR->readFrame();
             // QVERIFY(frameR.payload().length() == frameW.payload().length());
             if (Q_UNLIKELY(frameR.payload().length() != frameW.payload().length()))
-                QSKIP("bad dlc!");
+                QSKIP("Bad CAN dlc!");
             read_count++;
 
             QString view;
