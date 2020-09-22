@@ -1,5 +1,5 @@
 #include <QtTest/QtTest>
-#define USE_LOCAL_PLUGIN 1
+//#define USE_LOCAL_PLUGIN 1
 
 #ifndef USE_LOCAL_PLUGIN
 #include <QtSerialBus/qcanbusframe.h>
