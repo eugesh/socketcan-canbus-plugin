@@ -1,5 +1,4 @@
 #include <QtTest/QtTest>
-//#define USE_LOCAL_PLUGIN 1
 
 #ifndef USE_LOCAL_PLUGIN
 #include <QtSerialBus/qcanbusframe.h>
@@ -13,6 +12,7 @@
 #include "qcanbusframe_v2.h"
 #include "qcanbusdevice_v2.h"
 #include "qcanbus_v2.h"
+#include "qcanbusdevice_v2.h"
 #else
 #include <QCanBusDevice>
 #include <QCanBus>
@@ -27,6 +27,12 @@ Q_DECLARE_METATYPE(QIODevice::OpenModeFlag);
 Q_DECLARE_METATYPE(Qt::ConnectionType);
 
 #define BIGN 100500
+
+#ifdef WIN32
+    const QString Plugin = "virtualcan";
+#else
+    const QString Plugin = "socketcan";
+#endif
 
 class tst_QSerialBus : public QObject
 {
@@ -131,29 +137,30 @@ void tst_QSerialBus::initTestCase() {
 
     qDebug() << "m_senderPortName = " << m_senderPortName;
     qDebug() << "m_receiverPortName = " << m_receiverPortName;
-
-    bus = QCanBus::instance();
-    QVERIFY(bus);
-    QCanBus *sameInstance = QCanBus::instance();
-    QCOMPARE(bus, sameInstance);
 }
 
 void tst_QSerialBus::createDevice()
 {
     QString errorString;
 
-#ifdef WIN32
-    m_canDeviceR = QCanBus::instance()->createDevice("virtualcan", m_receiverPortName, &errorString);
-    m_canDeviceW = QCanBus::instance()->createDevice("virtualcan", m_senderPortName, &errorString);
+#ifdef USE_LOCAL_PLUGIN
+    m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
+    m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
 #else
-    m_canDeviceR = QCanBus::instance()->createDevice("socketcan", m_receiverPortName, &errorString);
-    m_canDeviceW = QCanBus::instance()->createDevice("socketcan", m_senderPortName, &errorString);
+    m_canDeviceR = QCanBus::instance()->createDevice(Plugin, m_receiverPortName, &errorString);
+    m_canDeviceW = QCanBus::instance()->createDevice(Plugin, m_senderPortName, &errorString);
 #endif
     QVERIFY (m_canDeviceR && m_canDeviceW);
 
-    if (! m_canDeviceR || ! m_canDeviceW ) {
+    if (! m_canDeviceR ) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
-        qInfo() << "Plugin: " << "socketcan" << "Port" << m_receiverPortName;
+        qInfo() << "Plugin: " << Plugin << "Port" << m_receiverPortName;
+        return;
+    }
+
+    if (! m_canDeviceW ) {
+        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
+        qInfo() << "Plugin: " << Plugin << "Port" << m_senderPortName;
         return;
     }
 
