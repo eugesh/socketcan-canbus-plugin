@@ -1,30 +1,13 @@
 #include <QtTest/QtTest>
-
-#ifndef USE_LOCAL_PLUGIN
 #include <QtSerialBus/qcanbusframe.h>
 #include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbusdeviceinfo.h>
 #include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusfactory.h>
-#else
-#ifndef WIN32
-#include "socketcanbackend_v2.h"
-#include "qcanbusframe_v2.h"
-#include "qcanbusdevice_v2.h"
-#include "qcanbus_v2.h"
-#include "qcanbusdevice_v2.h"
-#else
-#include <QCanBusDevice>
-#include <QCanBus>
-#include <QCanBusFrame>
-#include <QCanBus>
-#endif
-#endif
-#include <QThread>
 
-Q_DECLARE_METATYPE(QIODevice::OpenMode);
-Q_DECLARE_METATYPE(QIODevice::OpenModeFlag);
-Q_DECLARE_METATYPE(Qt::ConnectionType);
+Q_DECLARE_METATYPE(QIODevice::OpenMode)
+Q_DECLARE_METATYPE(QIODevice::OpenModeFlag)
+Q_DECLARE_METATYPE(Qt::ConnectionType)
 
 #define BIGN 100500
 
