@@ -12,6 +12,45 @@
 #include <QString>
 #include <QtTest/qtest.h>
 
+QList<QCanBusFrame>
+read_long_file(QString const& path) {
+    QList<QCanBusFrame> frames;
+
+    QFile file(path);
+
+    if (!file.open(QFile::ReadOnly)) {
+        QString msg = QString("Failed to open %1\n%2")
+                             .arg(path)
+                             .arg(file.errorString());
+        qWarning() << QString("Error") + msg;
+        return QList<QCanBusFrame>();
+    }
+
+    while (!file.atEnd()) {
+        QByteArray line = file.readLine().simplified();
+
+        auto fields = line.split(' ');
+
+        int canId = fields[1].toUInt(nullptr, 16);
+        QByteArray len_arr = fields[2];
+        len_arr.replace('[', "");
+        len_arr.replace(']', "");
+        int len = len_arr.toUInt();
+        QByteArray payload;
+
+        for (int i = 0; i < len; ++i)
+            payload.append(QByteArray::fromHex(fields[3 + i]));
+
+        // qDebug() << canId << " [" << len << "] " << payload;
+
+        QCanBusFrame frame = QCanBusFrame(canId, payload);
+
+        frames << frame;
+    }
+
+    return frames;
+}
+
 // Returns port name.
 QString find_can_device () {
     QString errorMessage;

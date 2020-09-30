@@ -104,36 +104,6 @@ enum {
     DeviceIsActive = 1
 };
 
-/**
- * @brief writeCANFrame writes any can_frame or canfd_frame in opened socket.
- * @param canSocket opened socket descriptor;
- * @param buf CAN frame;
- * @param count CAN frame's length (CAN_MTU or CANFD_MTU);
- * @return bytes written.
- */
-qint64 writeCANFrame(int canSocket, const void *buf, size_t count) {
-    struct pollfd fds;
-
-    fds.fd = canSocket;
-    fds.events = POLLOUT;
-
-    while (::write(canSocket, buf, count) != count) {
-        if (Q_UNLIKELY(errno != ENOBUFS && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)) {
-            perror("write");
-            return -1;
-        }
-        else {
-            // Waits no more than 1 millisecond when descriptor becomes ready or the call is interrupted by a signal handler.
-            if (poll(&fds, 1, 1) < 0) {
-                perror("poll");
-                return -1;
-            }
-        }
-    }
-
-    return count;
-}
-
 static QByteArray fileContent(const QString &fileName)
 {
     QFile file(fileName);
@@ -512,7 +482,7 @@ bool SocketCanBackend_v2::writeFrame(const QCanBusFrame &newData)
     return true;
 }
 
-void SocketCanBackend_v2::writeSocket(int socket)
+void SocketCanBackend_v2::writeSocket()
 {
     writeNotifier->setEnabled(false);
     auto enableWriteNotifier = qScopeGuard([this] {
@@ -572,6 +542,9 @@ void SocketCanBackend_v2::writeSocket(int socket)
             }
             return;
         } else if (bytesWritten < bytesMustBeWritten) {
+            qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "write: incomplete CAN frame."); // According to cangen implementation
+            setError(qt_error_string(errno), QCanBusDevice::CanBusError::WriteError);
+            dequeueOutgoingFrame();
             return;
         }
         dequeueOutgoingFrame();

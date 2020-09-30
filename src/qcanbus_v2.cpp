@@ -36,6 +36,7 @@
 
 #include "qcanbus_v2.h"
 #include "qcanbusfactory_v2.h"
+#include "socketcanbackend_v2.h"
 
 #include <QtCore/qcoreapplication.h>
 #include <QtCore/qglobalstatic.h>
@@ -162,19 +163,24 @@ static QObject *canBusFactory(const QString &plugin, QString *errorMessage)
 */
 QList<QCanBusDeviceInfo> QCanBus::availableDevices(const QString &plugin, QString *errorMessage) const
 {
-    const QObject *obj = canBusFactory(plugin, errorMessage);
-    if (Q_UNLIKELY(!obj))
-        return QList<QCanBusDeviceInfo>();
-
-    const QCanBusFactoryV2 *factoryV2 = qobject_cast<QCanBusFactoryV2 *>(obj);
-    if (Q_UNLIKELY(!factoryV2)) {
-        setErrorMessage(errorMessage,
-                        tr("The plugin '%1' does not provide this function.").arg(plugin));
-        return QList<QCanBusDeviceInfo>();
-    }
-
     QString errorString;
-    QList<QCanBusDeviceInfo> result = factoryV2->availableDevices(&errorString);
+    QList<QCanBusDeviceInfo> result;
+    if (plugin.contains("socketcan", Qt::CaseInsensitive)) {
+        result = SocketCanBackend_v2::interfaces();
+    } else {
+        const QObject *obj = canBusFactory(plugin, errorMessage);
+        if (Q_UNLIKELY(!obj))
+            return QList<QCanBusDeviceInfo>();
+
+        const QCanBusFactoryV2 *factoryV2 = qobject_cast<QCanBusFactoryV2 *>(obj);
+        if (Q_UNLIKELY(!factoryV2)) {
+            setErrorMessage(errorMessage,
+                            tr("The plugin '%1' does not provide this function.").arg(plugin));
+            return QList<QCanBusDeviceInfo>();
+        }
+
+        result = factoryV2->availableDevices(&errorString);
+    }
 
     setErrorMessage(errorMessage, errorString);
     return result;
