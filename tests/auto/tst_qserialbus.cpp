@@ -1,21 +1,48 @@
-#include <QtTest/QtTest>
-#include <QtSerialBus/qcanbusframe.h>
+/****************************************************************************
+**
+** Copyright (C) 2017 The Qt Company Ltd.
+** Evgeny Shtanov
+** Denis Shienkov
+** Contact: http://www.qt.io/licensing/
+**
+** This file is part of the QtSerialBus module of the Qt Toolkit.
+**
+** $QT_BEGIN_LICENSE:LGPL3$
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and The Qt Company. For licensing terms
+** and conditions see http://www.qt.io/terms-conditions. For further
+** information use the contact form at http://www.qt.io/contact-us.
+**
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 3 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPLv3 included in the
+** packaging of this file. Please review the following information to
+** ensure the GNU Lesser General Public License version 3 requirements
+** will be met: https://www.gnu.org/licenses/lgpl.html.
+**
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 2.0 or later as published by the Free
+** Software Foundation and appearing in the file LICENSE.GPL included in
+** the packaging of this file. Please review the following information to
+** ensure the GNU General Public License version 2.0 requirements will be
+** met: http://www.gnu.org/licenses/gpl-2.0.html.
+**
+** $QT_END_LICENSE$
+**
+****************************************************************************/
+#include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbusdeviceinfo.h>
-#include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusfactory.h>
-
-Q_DECLARE_METATYPE(QIODevice::OpenMode)
-Q_DECLARE_METATYPE(QIODevice::OpenModeFlag)
-Q_DECLARE_METATYPE(Qt::ConnectionType)
+#include <QtSerialBus/qcanbusframe.h>
+#include <QtTest/QtTest>
 
 #define BIGN 100500
-
-#ifdef WIN32
-    const QString Plugin = "virtualcan";
-#else
-    const QString Plugin = "socketcan";
-#endif
 
 class tst_QSerialBus : public QObject
 {
@@ -57,14 +84,12 @@ private slots:
     void ReadWriteLoop();
 
 private:
-    QString m_senderPortName;
-    QString m_receiverPortName;
-    QStringList m_availablePortNames;
+    QString m_sender;
+    QString m_receiver;
+    QString Plugin = "vcan0";
     QCanBusDevice * m_canDeviceR;
     QCanBusDevice * m_canDeviceW;
-
     static int loopLevel;
-    QCanBus *bus = nullptr;
 };
 
 int tst_QSerialBus::loopLevel = 0;
@@ -77,7 +102,7 @@ class AsyncReader : public QObject
 {
     Q_OBJECT
 public:
-    explicit AsyncReader(QCanBusDevice * device, Qt::ConnectionType connectionType, int expectedFramesCount)
+    explicit AsyncReader(QCanBusDevice *device, Qt::ConnectionType connectionType, int expectedFramesCount)
         : m_device(device), m_expectedFramesCount(expectedFramesCount)
     {
         connect(device, &QCanBusDevice::framesReceived, this, &AsyncReader::receive, connectionType);
@@ -97,11 +122,12 @@ private:
     const int m_expectedFramesCount;
 };
 
-void tst_QSerialBus::initTestCase() {
+void tst_QSerialBus::initTestCase()
+{
     qputenv("QTEST_FUNCTION_TIMEOUT", QByteArray("90000000"));
-    m_senderPortName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
-    m_receiverPortName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
-    if (m_senderPortName.isEmpty() || m_receiverPortName.isEmpty()) {
+    m_sender = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
+    m_receiver = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
+    if (m_sender.isEmpty() || m_receiver.isEmpty()) {
         static const char message[] =
               "Test doesn't work because the names of CAN ports aren't found in env.\n"
               "Please set environment variables:\n"
@@ -117,12 +143,10 @@ void tst_QSerialBus::initTestCase() {
 #endif
 
         QSKIP(message);
-    } else {
-        m_availablePortNames << m_senderPortName << m_receiverPortName;
     }
 
-    qDebug() << "m_senderPortName = " << m_senderPortName;
-    qDebug() << "m_receiverPortName = " << m_receiverPortName;
+    qDebug() << "m_senderPortName = " << m_sender;
+    qDebug() << "m_receiverPortName = " << m_receiver;
 }
 
 void tst_QSerialBus::createDevice()
@@ -130,23 +154,23 @@ void tst_QSerialBus::createDevice()
     QString errorString;
 
 #ifdef USE_LOCAL_PLUGIN
-    m_canDeviceR = new SocketCanBackend_v2(m_receiverPortName);
-    m_canDeviceW = new SocketCanBackend_v2(m_senderPortName);
+    m_canDeviceR = new SocketCanBackend_v2(m_receiver);
+    m_canDeviceW = new SocketCanBackend_v2(m_sender);
 #else
-    m_canDeviceR = QCanBus::instance()->createDevice(Plugin, m_receiverPortName, &errorString);
-    m_canDeviceW = QCanBus::instance()->createDevice(Plugin, m_senderPortName, &errorString);
+    m_canDeviceR = QCanBus::instance()->createDevice(Plugin, m_receiver, &errorString);
+    m_canDeviceW = QCanBus::instance()->createDevice(Plugin, m_sender, &errorString);
 #endif
     QVERIFY (m_canDeviceR && m_canDeviceW);
 
     if (! m_canDeviceR ) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
-        qInfo() << "Plugin: " << Plugin << "Port" << m_receiverPortName;
+        qInfo() << "Plugin: " << Plugin << "Port" << m_receiver;
         return;
     }
 
     if (! m_canDeviceW ) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
-        qInfo() << "Plugin: " << Plugin << "Port" << m_senderPortName;
+        qInfo() << "Plugin: " << Plugin << "Port" << m_sender;
         return;
     }
 
@@ -229,12 +253,6 @@ tst_QSerialBus::ReadWriteLoop() {
                 view = m_canDeviceR->interpretErrorFrame(frameR);
             else
                 view = frameR.toString();
-
-            const QString time = QString::fromLatin1("%1.%2  ")
-                    .arg(frameR.timeStamp().seconds(), 10, 10, QLatin1Char(' '))
-                    .arg(frameR.timeStamp().microSeconds() / 100, 4, 10, QLatin1Char('0'));
-
-            // qInfo() << "Loop #" << tst_QSerialBus::loopLevel << ", Receive: " << frameR.toString();
         }
     }
     qInfo() << "write_count = " << write_count;
