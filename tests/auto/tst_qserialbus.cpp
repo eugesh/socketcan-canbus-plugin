@@ -35,14 +35,21 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
+#ifdef USE_LOCAL_PLUGIN
+#include "qcanbusdevice_v2.h"
+#include "qcanbusframe_v2.h"
+#include "qcanbus_v2.h"
+#include "qcanbusfactory_v2.h"
+#include "socketcanbackend_v2.h"
+#else
 #include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbusdeviceinfo.h>
 #include <QtSerialBus/qcanbusfactory.h>
 #include <QtSerialBus/qcanbusframe.h>
+#endif
 #include <QtTest/QtTest>
-
-#define BIGN 100500
+#define BIGN 1005000
 
 class tst_QSerialBus : public QObject
 {
@@ -126,7 +133,9 @@ void tst_QSerialBus::initTestCase()
 {
     qputenv("QTEST_FUNCTION_TIMEOUT", QByteArray("90000000"));
     m_sender = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
+    m_sender = "vcan0";
     m_receiver = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
+    m_receiver = "vcan0";
     if (m_sender.isEmpty() || m_receiver.isEmpty()) {
         static const char message[] =
               "Test doesn't work because the names of CAN ports aren't found in env.\n"
