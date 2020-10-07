@@ -93,7 +93,7 @@ private slots:
 private:
     QString m_sender;
     QString m_receiver;
-    QString Plugin = "vcan0";
+    QString Plugin = "socketcan";
     QCanBusDevice * m_canDeviceR;
     QCanBusDevice * m_canDeviceW;
     static int loopLevel;
@@ -101,7 +101,8 @@ private:
 
 int tst_QSerialBus::loopLevel = 0;
 
-tst_QSerialBus::tst_QSerialBus() {
+tst_QSerialBus::tst_QSerialBus()
+{
 
 }
 
