@@ -49,7 +49,6 @@
 #include <QtSerialBus/qcanbusframe.h>
 #endif
 #include <QtTest/QtTest>
-#define BIGN 1005000
 
 class tst_QSerialBus : public QObject
 {
@@ -91,8 +90,8 @@ private slots:
     void ReadWriteLoop();
 
 private:
-    QString m_sender;
-    QString m_receiver;
+    QString m_sender = "vcan0";
+    QString m_receiver = "vcan0";
     QString Plugin = "socketcan";
     QCanBusDevice * m_canDeviceR;
     QCanBusDevice * m_canDeviceW;
@@ -144,13 +143,7 @@ void tst_QSerialBus::initTestCase()
               " QTEST_SERIALBUS_SENDER to name of output CAN port\n"
               " QTEST_SERIALBUS_RECEIVER to name of input CAN port\n"
               "Specify short names of port"
-#if defined(Q_OS_UNIX)
               ", like: vcan0\n";
-#elif defined(Q_OS_WIN32)
-              ", like: can0\n";
-#else
-              "\n";
-#endif
 
         QSKIP(message);
     }
@@ -224,8 +217,6 @@ tst_QSerialBus::on_write_error(QCanBusDevice::CanBusError err) {
         case QCanBusDevice::UnknownError:
             err_string = "UnknownError";
             break;
-        default:
-            break;
     }
 
     err_string.append(QString(", Errno: %1. Do you use the latest patchset of socketcan plugin?").arg(errno));
@@ -233,10 +224,10 @@ tst_QSerialBus::on_write_error(QCanBusDevice::CanBusError err) {
     QFAIL(err_string.toStdString().c_str());
 }
 
-void
-tst_QSerialBus::ReadWriteLoop() {
-    long unsigned int read_count = 0;
-    long unsigned int write_count = 0;
+void tst_QSerialBus::ReadWriteLoop() {
+    long unsigned int currentReadFrameNumber = 0;
+    long unsigned int currentWriteFrameNumber = 0;
+    const int kMaxFramesCount = 1005000;
 
     AsyncReader * areader = new AsyncReader(m_canDeviceR, Qt::ConnectionType::AutoConnection, 1);
 
@@ -246,9 +237,9 @@ tst_QSerialBus::ReadWriteLoop() {
 
     qInfo() << "Loop #" << tst_QSerialBus::loopLevel << ", Write: " << frameW.toString();
 
-    for (int i=0; i < BIGN; ++i) {
+    for (int i=0; i < kMaxFramesCount; ++i) {
         m_canDeviceW->writeFrame(frameW);
-        write_count++;
+        currentWriteFrameNumber++;
         enterLoop(1);
 
         while (m_canDeviceR->framesAvailable()) {
@@ -256,7 +247,7 @@ tst_QSerialBus::ReadWriteLoop() {
             // QVERIFY(frameR.payload().length() == frameW.payload().length());
             if (Q_UNLIKELY(frameR.payload().length() != frameW.payload().length()))
                 QSKIP("Bad CAN dlc!");
-            read_count++;
+            currentReadFrameNumber++;
 
             QString view;
             if (frameR.frameType() == QCanBusFrame::ErrorFrame)
@@ -265,9 +256,9 @@ tst_QSerialBus::ReadWriteLoop() {
                 view = frameR.toString();
         }
     }
-    qInfo() << "write_count = " << write_count;
-    qInfo() << "read_count = " << read_count;
-    QVERIFY (write_count == read_count);
+    qInfo() << "write_count = " << currentWriteFrameNumber;
+    qInfo() << "read_count = " << currentReadFrameNumber;
+    QVERIFY (currentWriteFrameNumber == currentReadFrameNumber);
 }
 
 QTEST_MAIN(tst_QSerialBus)
