@@ -50,6 +50,8 @@
 #endif
 #include <QtTest/QtTest>
 
+#define MAX_TIMEOUT 1000000
+
 class tst_QSerialBus : public QObject
 {
     Q_OBJECT
@@ -82,12 +84,13 @@ public:
     }
 
 protected slots:
-    void on_write_error(QCanBusDevice::CanBusError err);
+    void on_error_occured(QCanBusDevice::CanBusError err);
+    void ReadWriteLoop();
 
 private slots:
     void initTestCase();
     void createDevice();
-    void ReadWriteLoop();
+    void ReadWriteLoop2();
 
 private:
     QString m_sender = "vcan0";
@@ -192,11 +195,11 @@ void tst_QSerialBus::createDevice()
         return;
     }
 
-    connect (m_canDeviceW, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_write_error);
+    connect (m_canDeviceW, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured);
 }
 
 void
-tst_QSerialBus::on_write_error(QCanBusDevice::CanBusError err) {
+tst_QSerialBus::on_error_occured(QCanBusDevice::CanBusError err) {
     QString err_string;
     switch (err) {
         case QCanBusDevice::NoError:
@@ -227,7 +230,7 @@ tst_QSerialBus::on_write_error(QCanBusDevice::CanBusError err) {
 void tst_QSerialBus::ReadWriteLoop() {
     long unsigned int currentReadFrameNumber = 0;
     long unsigned int currentWriteFrameNumber = 0;
-    const int kMaxFramesCount = 1005000;
+    const int kMaxFramesCount = 100500;
 
     AsyncReader * areader = new AsyncReader(m_canDeviceR, Qt::ConnectionType::AutoConnection, 1);
 
@@ -256,6 +259,56 @@ void tst_QSerialBus::ReadWriteLoop() {
                 view = frameR.toString();
         }
     }
+    qInfo() << "write_count = " << currentWriteFrameNumber;
+    qInfo() << "read_count = " << currentReadFrameNumber;
+    QVERIFY (currentWriteFrameNumber == currentReadFrameNumber);
+}
+
+void tst_QSerialBus::ReadWriteLoop2() {
+    long unsigned int currentReadFrameNumber = 0;
+    //long unsigned int
+    qulonglong currentWriteFrameNumber = 0;
+    const int kMaxFramesCount = 100500;
+    QCanBusFrame frameW;
+
+    auto frameWriter = [&](qint64 framesCount) {
+        if (currentWriteFrameNumber >= kMaxFramesCount)
+            return;
+        QCanBusFrame frame;
+        frameW.setFrameId(123);
+        QByteArray payload = QByteArray::number(++currentWriteFrameNumber, 16);
+        frameW.setPayload(payload); // Add current frame number to payload
+        m_canDeviceW->writeFrame(frame);
+     };
+
+    connect(m_canDeviceW, &QCanBusDevice::framesWritten, frameWriter);
+    /*connect(m_canDeviceW, &QCanBusDevice::errorOccurred, [on_write_error]() {
+        QFAIL("");
+    });*/
+
+    auto frameReader = [&]() {
+        const auto frames = m_canDeviceR->readAllFrames();
+        for (const auto &frame : frames) {
+            QCOMPARE(frame.frameId(), 0x123);
+            bool *ok = nullptr;
+            const qulonglong frameNumber = frame.payload().toULongLong(ok, 16); // framenumber; // extract frame number from payload
+            QCOMPARE(frameNumber, currentReadFrameNumber);
+            ++currentReadFrameNumber;
+        }
+
+        if (currentReadFrameNumber == kMaxFramesCount)
+             exitLoop();
+     };
+
+    connect(m_canDeviceR, &QCanBusDevice::framesAvailable, frameReader);
+    connect(m_canDeviceR, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured); //( ) {
+        //QFAIL(); // blabla;
+    //});
+
+    frameWriter(0);
+
+    enterLoop(MAX_TIMEOUT);
+
     qInfo() << "write_count = " << currentWriteFrameNumber;
     qInfo() << "read_count = " << currentReadFrameNumber;
     QVERIFY (currentWriteFrameNumber == currentReadFrameNumber);
