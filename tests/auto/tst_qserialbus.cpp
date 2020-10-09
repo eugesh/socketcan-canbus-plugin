@@ -85,7 +85,6 @@ public:
 
 protected slots:
     void on_error_occured(QCanBusDevice::CanBusError err);
-    void ReadWriteLoop();
 
 private slots:
     void initTestCase();
@@ -107,30 +106,6 @@ tst_QSerialBus::tst_QSerialBus()
 {
 
 }
-
-class AsyncReader : public QObject
-{
-    Q_OBJECT
-public:
-    explicit AsyncReader(QCanBusDevice *device, Qt::ConnectionType connectionType, int expectedFramesCount)
-        : m_device(device), m_expectedFramesCount(expectedFramesCount)
-    {
-        connect(device, &QCanBusDevice::framesReceived, this, &AsyncReader::receive, connectionType);
-    }
-
-private slots:
-    void receive()
-    {
-        if (m_device->framesAvailable() < m_expectedFramesCount)
-            return;
-
-        tst_QSerialBus::exitLoop();
-    }
-
-private:
-    QCanBusDevice * m_device;
-    const int m_expectedFramesCount;
-};
 
 void tst_QSerialBus::initTestCase()
 {
@@ -227,58 +202,20 @@ tst_QSerialBus::on_error_occured(QCanBusDevice::CanBusError err) {
     QFAIL(err_string.toStdString().c_str());
 }
 
-void tst_QSerialBus::ReadWriteLoop() {
-    long unsigned int currentReadFrameNumber = 0;
-    long unsigned int currentWriteFrameNumber = 0;
-    const int kMaxFramesCount = 100500;
-
-    AsyncReader * areader = new AsyncReader(m_canDeviceR, Qt::ConnectionType::AutoConnection, 1);
-
-    QCanBusFrame frameW;
-    frameW.setFrameId(123);
-    frameW.setPayload(QByteArray::fromHex("E0FF"));
-
-    qInfo() << "Loop #" << tst_QSerialBus::loopLevel << ", Write: " << frameW.toString();
-
-    for (int i=0; i < kMaxFramesCount; ++i) {
-        m_canDeviceW->writeFrame(frameW);
-        currentWriteFrameNumber++;
-        enterLoop(1);
-
-        while (m_canDeviceR->framesAvailable()) {
-            const QCanBusFrame frameR = m_canDeviceR->readFrame();
-            // QVERIFY(frameR.payload().length() == frameW.payload().length());
-            if (Q_UNLIKELY(frameR.payload().length() != frameW.payload().length()))
-                QSKIP("Bad CAN dlc!");
-            currentReadFrameNumber++;
-
-            QString view;
-            if (frameR.frameType() == QCanBusFrame::ErrorFrame)
-                view = m_canDeviceR->interpretErrorFrame(frameR);
-            else
-                view = frameR.toString();
-        }
-    }
-    qInfo() << "write_count = " << currentWriteFrameNumber;
-    qInfo() << "read_count = " << currentReadFrameNumber;
-    QVERIFY (currentWriteFrameNumber == currentReadFrameNumber);
-}
-
 void tst_QSerialBus::ReadWriteLoop2() {
     long unsigned int currentReadFrameNumber = 0;
     //long unsigned int
     qulonglong currentWriteFrameNumber = 0;
     const int kMaxFramesCount = 100500;
     QCanBusFrame frameW;
+    frameW.setFrameId(123);
 
     auto frameWriter = [&](qint64 framesCount) {
         if (currentWriteFrameNumber >= kMaxFramesCount)
             return;
-        QCanBusFrame frame;
-        frameW.setFrameId(123);
         QByteArray payload = QByteArray::number(++currentWriteFrameNumber, 16);
         frameW.setPayload(payload); // Add current frame number to payload
-        m_canDeviceW->writeFrame(frame);
+        m_canDeviceW->writeFrame(frameW);
      };
 
     connect(m_canDeviceW, &QCanBusDevice::framesWritten, frameWriter);
