@@ -89,12 +89,12 @@ protected slots:
 private slots:
     void initTestCase();
     void createDevice();
-    void ReadWriteLoop2();
+    void ReadWriteLoop();
 
 private:
     QString m_sender = "vcan0";
     QString m_receiver = "vcan0";
-    QString Plugin = "socketcan";
+    QString m_plugin = "socketcan";
     QCanBusDevice * m_canDeviceR;
     QCanBusDevice * m_canDeviceW;
     static int loopLevel;
@@ -111,17 +111,18 @@ void tst_QSerialBus::initTestCase()
 {
     qputenv("QTEST_FUNCTION_TIMEOUT", QByteArray("90000000"));
     m_sender = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
-    m_sender = "vcan0";
     m_receiver = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
-    m_receiver = "vcan0";
+    m_plugin = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_PLUGIN_NAME"));
+
     if (m_sender.isEmpty() || m_receiver.isEmpty()) {
         static const char message[] =
               "Test doesn't work because the names of CAN ports aren't found in env.\n"
               "Please set environment variables:\n"
               " QTEST_SERIALBUS_SENDER to name of output CAN port\n"
               " QTEST_SERIALBUS_RECEIVER to name of input CAN port\n"
-              "Specify short names of port"
-              ", like: vcan0\n";
+              " QTEST_SERIALBUS_PLUGIN_NAME to name CAN plugin (backend)\n"
+              "Specify short names of port, like: vcan0\n"
+              "Specify name of backend, like: socketcan\n";
 
         QSKIP(message);
     }
@@ -145,13 +146,13 @@ void tst_QSerialBus::createDevice()
 
     if (! m_canDeviceR ) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
-        qInfo() << "Plugin: " << Plugin << "Port" << m_receiver;
+        qInfo() << "Plugin: " << m_plugin << "Port" << m_receiver;
         return;
     }
 
     if (! m_canDeviceW ) {
         qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
-        qInfo() << "Plugin: " << Plugin << "Port" << m_sender;
+        qInfo() << "Plugin: " << m_plugin << "Port" << m_sender;
         return;
     }
 
@@ -202,15 +203,15 @@ tst_QSerialBus::on_error_occured(QCanBusDevice::CanBusError err) {
     QFAIL(err_string.toStdString().c_str());
 }
 
-void tst_QSerialBus::ReadWriteLoop2() {
+void tst_QSerialBus::ReadWriteLoop() {
     long unsigned int currentReadFrameNumber = 0;
     //long unsigned int
     qulonglong currentWriteFrameNumber = 0;
     const int kMaxFramesCount = 100500;
     QCanBusFrame frameW;
-    frameW.setFrameId(123);
+    frameW.setFrameId(0x123);
 
-    auto frameWriter = [&](qint64 framesCount) {
+    auto frameWriter = [&]() {
         if (currentWriteFrameNumber >= kMaxFramesCount)
             return;
         QByteArray payload = QByteArray::number(++currentWriteFrameNumber, 16);
@@ -228,21 +229,20 @@ void tst_QSerialBus::ReadWriteLoop2() {
         for (const auto &frame : frames) {
             QCOMPARE(frame.frameId(), 0x123);
             bool *ok = nullptr;
-            const qulonglong frameNumber = frame.payload().toULongLong(ok, 16); // framenumber; // extract frame number from payload
-            QCOMPARE(frameNumber, currentReadFrameNumber);
-            ++currentReadFrameNumber;
+            const qulonglong frameNumber = frame.payload().toULongLong(ok, 16); // extract frame number from payload
+            QCOMPARE(frameNumber, ++currentReadFrameNumber);
         }
 
         if (currentReadFrameNumber == kMaxFramesCount)
              exitLoop();
      };
 
-    connect(m_canDeviceR, &QCanBusDevice::framesAvailable, frameReader);
+    connect(m_canDeviceR, &QCanBusDevice::framesReceived, frameReader);
     connect(m_canDeviceR, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured); //( ) {
-        //QFAIL(); // blabla;
+        //QFAIL();
     //});
 
-    frameWriter(0);
+    frameWriter();
 
     enterLoop(MAX_TIMEOUT);
 
