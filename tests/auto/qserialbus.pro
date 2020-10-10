@@ -1,15 +1,13 @@
 QT = core testlib
 TARGET = tst_qserialbus
-#CONFIG += testcase
-
 QT += serialbus
 
 #DEFINES += USE_LOCAL_PLUGIN
 
-#INCLUDEPATH += ../../socketcan-canbus-plugin/src
+SOURCES = tst_qserialbus.cpp
+
 INCLUDEPATH += ../../src
 
-SOURCES = tst_qserialbus.cpp
 
 contains (DEFINES, USE_LOCAL_PLUGIN): {
 QT -= serialbus
