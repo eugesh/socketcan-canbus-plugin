@@ -95,8 +95,8 @@ private:
     QString m_sender = "vcan0";
     QString m_receiver = "vcan0";
     QString m_plugin = "socketcan";
-    QCanBusDevice * m_canDeviceR;
-    QCanBusDevice * m_canDeviceW;
+    QCanBusDevice *m_canDeviceR = nullptr;
+    QCanBusDevice *m_canDeviceW = nullptr;
     static int loopLevel;
 };
 
@@ -114,7 +114,7 @@ void tst_QSerialBus::initTestCase()
     m_receiver = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
     m_plugin = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_PLUGIN_NAME"));
 
-    if (m_sender.isEmpty() || m_receiver.isEmpty()) {
+    if (m_sender.isEmpty() || m_receiver.isEmpty() || m_plugin.isEmpty()) {
         static const char message[] =
               "Test doesn't work because the names of CAN ports aren't found in env.\n"
               "Please set environment variables:\n"
@@ -139,8 +139,8 @@ void tst_QSerialBus::createDevice()
     m_canDeviceR = new SocketCanBackend_v2(m_receiver);
     m_canDeviceW = new SocketCanBackend_v2(m_sender);
 #else
-    m_canDeviceR = QCanBus::instance()->createDevice(Plugin, m_receiver, &errorString);
-    m_canDeviceW = QCanBus::instance()->createDevice(Plugin, m_sender, &errorString);
+    m_canDeviceR = QCanBus::instance()->createDevice(m_plugin, m_receiver, &errorString);
+    m_canDeviceW = QCanBus::instance()->createDevice(m_plugin, m_sender, &errorString);
 #endif
     QVERIFY (m_canDeviceR && m_canDeviceW);
 
@@ -204,8 +204,7 @@ tst_QSerialBus::on_error_occured(QCanBusDevice::CanBusError err) {
 }
 
 void tst_QSerialBus::ReadWriteLoop() {
-    long unsigned int currentReadFrameNumber = 0;
-    //long unsigned int
+    qulonglong currentReadFrameNumber = 0;
     qulonglong currentWriteFrameNumber = 0;
     const int kMaxFramesCount = 100500;
     QCanBusFrame frameW;
