@@ -170,8 +170,6 @@ void tst_QSerialBus::createDevice()
         qCritical() << "Error: Write Socket wasn't initialized!";
         return;
     }
-
-    connect (m_canDeviceW, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured);
 }
 
 void
@@ -218,10 +216,37 @@ void tst_QSerialBus::ReadWriteLoop() {
         m_canDeviceW->writeFrame(frameW);
      };
 
+    auto on_error_occured = [&](QCanBusDevice::CanBusError err) {
+        QString err_string;
+        switch (err) {
+            case QCanBusDevice::NoError:
+                err_string = "NoError";
+                break;
+            case QCanBusDevice::ReadError :
+                err_string = "ReadError";
+                break;
+            case QCanBusDevice::WriteError:
+                err_string = "WriteError";
+                break;
+            case QCanBusDevice::ConnectionError:
+                err_string = "ConnectionError";
+                break;
+            case QCanBusDevice::ConfigurationError:
+                err_string = "ConfigurationError";
+                break;
+            case QCanBusDevice::UnknownError:
+                err_string = "UnknownError";
+                break;
+        }
+
+        err_string.append(QString(", Errno: %1. Do you use the latest patchset of socketcan plugin?").arg(errno));
+
+        QFAIL(err_string.toStdString().c_str());
+    };
+
     connect(m_canDeviceW, &QCanBusDevice::framesWritten, frameWriter);
-    /*connect(m_canDeviceW, &QCanBusDevice::errorOccurred, [on_write_error]() {
-        QFAIL("");
-    });*/
+    // connect (m_canDeviceW, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured);
+    connect(m_canDeviceW, &QCanBusDevice::errorOccurred, on_error_occured);
 
     auto frameReader = [&]() {
         const auto frames = m_canDeviceR->readAllFrames();
@@ -237,7 +262,8 @@ void tst_QSerialBus::ReadWriteLoop() {
      };
 
     connect(m_canDeviceR, &QCanBusDevice::framesReceived, frameReader);
-    connect(m_canDeviceR, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured); //( ) {
+    connect(m_canDeviceR, &QCanBusDevice::errorOccurred, on_error_occured);
+    //connect(m_canDeviceR, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured); //( ) {
         //QFAIL();
     //});
 
