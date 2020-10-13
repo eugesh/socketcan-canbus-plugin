@@ -56,7 +56,7 @@ class tst_QSerialBus : public QObject
 {
     Q_OBJECT
 public:
-    explicit tst_QSerialBus();
+    explicit tst_QSerialBus() {}
 
     static void enterLoop(int secs)
     {
@@ -83,29 +83,18 @@ public:
         return QTestEventLoop::instance().timeout();
     }
 
-protected slots:
-    void on_error_occured(QCanBusDevice::CanBusError err);
-
 private slots:
     void initTestCase();
-    void createDevice();
     void ReadWriteLoop();
 
 private:
     QString m_sender = "vcan0";
     QString m_receiver = "vcan0";
     QString m_plugin = "socketcan";
-    QCanBusDevice *m_canDeviceR = nullptr;
-    QCanBusDevice *m_canDeviceW = nullptr;
     static int loopLevel;
 };
 
 int tst_QSerialBus::loopLevel = 0;
-
-tst_QSerialBus::tst_QSerialBus()
-{
-
-}
 
 void tst_QSerialBus::initTestCase()
 {
@@ -131,8 +120,15 @@ void tst_QSerialBus::initTestCase()
     qDebug() << "m_receiverPortName = " << m_receiver;
 }
 
-void tst_QSerialBus::createDevice()
-{
+void tst_QSerialBus::ReadWriteLoop() {
+    QCanBusDevice *m_canDeviceR = nullptr;
+    QCanBusDevice *m_canDeviceW = nullptr;
+    qulonglong currentReadFrameNumber = 0;
+    qulonglong currentWriteFrameNumber = 0;
+    const int kMaxFramesCount = 100500;
+    QCanBusFrame frameW;
+    frameW.setFrameId(0x123);
+
     QString errorString;
 
 #ifdef USE_LOCAL_PLUGIN
@@ -170,43 +166,6 @@ void tst_QSerialBus::createDevice()
         qCritical() << "Error: Write Socket wasn't initialized!";
         return;
     }
-}
-
-void
-tst_QSerialBus::on_error_occured(QCanBusDevice::CanBusError err) {
-    QString err_string;
-    switch (err) {
-        case QCanBusDevice::NoError:
-            err_string = "NoError";
-            break;
-        case QCanBusDevice::ReadError :
-            err_string = "ReadError";
-            break;
-        case QCanBusDevice::WriteError:
-            err_string = "WriteError";
-            break;
-        case QCanBusDevice::ConnectionError:
-            err_string = "ConnectionError";
-            break;
-        case QCanBusDevice::ConfigurationError:
-            err_string = "ConfigurationError";
-            break;
-        case QCanBusDevice::UnknownError:
-            err_string = "UnknownError";
-            break;
-    }
-
-    err_string.append(QString(", Errno: %1. Do you use the latest patchset of socketcan plugin?").arg(errno));
-
-    QFAIL(err_string.toStdString().c_str());
-}
-
-void tst_QSerialBus::ReadWriteLoop() {
-    qulonglong currentReadFrameNumber = 0;
-    qulonglong currentWriteFrameNumber = 0;
-    const int kMaxFramesCount = 100500;
-    QCanBusFrame frameW;
-    frameW.setFrameId(0x123);
 
     auto frameWriter = [&]() {
         if (currentWriteFrameNumber >= kMaxFramesCount)
@@ -245,7 +204,6 @@ void tst_QSerialBus::ReadWriteLoop() {
     };
 
     connect(m_canDeviceW, &QCanBusDevice::framesWritten, frameWriter);
-    // connect (m_canDeviceW, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured);
     connect(m_canDeviceW, &QCanBusDevice::errorOccurred, on_error_occured);
 
     auto frameReader = [&]() {
@@ -263,9 +221,6 @@ void tst_QSerialBus::ReadWriteLoop() {
 
     connect(m_canDeviceR, &QCanBusDevice::framesReceived, frameReader);
     connect(m_canDeviceR, &QCanBusDevice::errorOccurred, on_error_occured);
-    //connect(m_canDeviceR, &QCanBusDevice::errorOccurred, this, &tst_QSerialBus::on_error_occured); //( ) {
-        //QFAIL();
-    //});
 
     frameWriter();
 
