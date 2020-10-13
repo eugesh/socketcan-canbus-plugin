@@ -35,22 +35,14 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
-#ifdef USE_LOCAL_PLUGIN
-#include "qcanbusdevice_v2.h"
-#include "qcanbusframe_v2.h"
-#include "qcanbus_v2.h"
-#include "qcanbusfactory_v2.h"
-#include "socketcanbackend_v2.h"
-#else
 #include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbusdeviceinfo.h>
 #include <QtSerialBus/qcanbusfactory.h>
 #include <QtSerialBus/qcanbusframe.h>
-#endif
 #include <QtTest/QtTest>
 
-#define MAX_TIMEOUT 1000000
+#define MAX_TIMEOUT 10000
 
 class tst_QSerialBus : public QObject
 {
@@ -115,9 +107,6 @@ void tst_QSerialBus::initTestCase()
 
         QSKIP(message);
     }
-
-    qDebug() << "m_senderPortName = " << m_sender;
-    qDebug() << "m_receiverPortName = " << m_receiver;
 }
 
 void tst_QSerialBus::ReadWriteLoop() {
@@ -131,24 +120,17 @@ void tst_QSerialBus::ReadWriteLoop() {
 
     QString errorString;
 
-#ifdef USE_LOCAL_PLUGIN
-    m_canDeviceR = new SocketCanBackend_v2(m_receiver);
-    m_canDeviceW = new SocketCanBackend_v2(m_sender);
-#else
     m_canDeviceR = QCanBus::instance()->createDevice(m_plugin, m_receiver, &errorString);
     m_canDeviceW = QCanBus::instance()->createDevice(m_plugin, m_sender, &errorString);
-#endif
     QVERIFY (m_canDeviceR && m_canDeviceW);
 
     if (! m_canDeviceR ) {
-        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
-        qInfo() << "Plugin: " << m_plugin << "Port" << m_receiver;
+        QFAIL(QString("Error: tst_QSerialBus::ReadWriteLoop: Receiving Device wasn't initialized! Error string: " + errorString).toStdString().c_str());
         return;
     }
 
     if (! m_canDeviceW ) {
-        qCritical() << "Error: QSocketCAN_connector::HW_init: Socket wasn't initialized! Error string: " << errorString;
-        qInfo() << "Plugin: " << m_plugin << "Port" << m_sender;
+        QFAIL(QString("Error: tst_QSerialBus::ReadWriteLoop: Sender Device wasn't initialized! Error string: " + errorString).toStdString().c_str());
         return;
     }
 
@@ -156,14 +138,14 @@ void tst_QSerialBus::ReadWriteLoop() {
         m_canDeviceR->connectDevice();
 
     if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)  {
-        qCritical() << "Error: Read Socket wasn't initialized!";
+        QFAIL(QString("Error: Read Socket wasn't initialized!").toStdString().c_str());
     }
 
     if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)
         m_canDeviceW->connectDevice();
 
     if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)  {
-        qCritical() << "Error: Write Socket wasn't initialized!";
+        QFAIL(QString("Error: Write Socket wasn't initialized!").toStdString().c_str());
         return;
     }
 
