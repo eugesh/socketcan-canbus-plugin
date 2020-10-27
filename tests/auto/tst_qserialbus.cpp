@@ -1,8 +1,6 @@
 /****************************************************************************
 **
 ** Copyright (C) 2017 The Qt Company Ltd.
-** Evgeny Shtanov
-** Denis Shienkov
 ** Contact: http://www.qt.io/licensing/
 **
 ** This file is part of the QtSerialBus module of the Qt Toolkit.
@@ -35,14 +33,13 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
+#include <QScopedPointer>
 #include <QtSerialBus/qcanbus.h>
 #include <QtSerialBus/qcanbusdevice.h>
 #include <QtSerialBus/qcanbusdeviceinfo.h>
 #include <QtSerialBus/qcanbusfactory.h>
 #include <QtSerialBus/qcanbusframe.h>
 #include <QtTest/QtTest>
-
-#define MAX_TIMEOUT 10000
 
 class tst_QSerialBus : public QObject
 {
@@ -77,12 +74,11 @@ public:
 
 private slots:
     void initTestCase();
-    void ReadWriteLoop();
+    void loopback();
+    void loopback_data();
 
 private:
-    QString m_sender = "vcan0";
-    QString m_receiver = "vcan0";
-    QString m_plugin = "socketcan";
+    QString m_senderName, m_receiverName, m_pluginName;
     static int loopLevel;
 };
 
@@ -91,11 +87,11 @@ int tst_QSerialBus::loopLevel = 0;
 void tst_QSerialBus::initTestCase()
 {
     qputenv("QTEST_FUNCTION_TIMEOUT", QByteArray("90000000"));
-    m_sender = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
-    m_receiver = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
-    m_plugin = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_PLUGIN_NAME"));
+    m_senderName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_SENDER"));
+    m_receiverName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_RECEIVER"));
+    m_pluginName = QString::fromLocal8Bit(qgetenv("QTEST_SERIALBUS_PLUGIN_NAME"));
 
-    if (m_sender.isEmpty() || m_receiver.isEmpty() || m_plugin.isEmpty()) {
+    if (m_senderName.isEmpty() || m_receiverName.isEmpty() || m_pluginName.isEmpty()) {
         static const char message[] =
               "Test doesn't work because the names of CAN ports aren't found in env.\n"
               "Please set environment variables:\n"
@@ -109,108 +105,70 @@ void tst_QSerialBus::initTestCase()
     }
 }
 
-void tst_QSerialBus::ReadWriteLoop() {
-    QCanBusDevice *m_canDeviceR = nullptr;
-    QCanBusDevice *m_canDeviceW = nullptr;
-    qulonglong currentReadFrameNumber = 0;
-    qulonglong currentWriteFrameNumber = 0;
-    const int kMaxFramesCount = 100500;
+void tst_QSerialBus::loopback_data()
+{
+   QTest::addColumn<int>("maxFramesCount");
+   QTest::addColumn<int>("frameId");
+   QTest::addColumn<int>("maxTimeout");
+   QTest::newRow("100600 frames with 0x123 id and 10000 timeout") << 100600 << 0x123 << 10000;
+}
+
+void tst_QSerialBus::loopback()
+{
+    QFETCH(int, maxFramesCount);
+    QFETCH(int, frameId);
+    QFETCH(int, maxTimeout);
+    int currentReadFrameNumber = 0;
+    int currentWriteFrameNumber = 0;
     QCanBusFrame frameW;
-    frameW.setFrameId(0x123);
+    frameW.setFrameId(quint32(frameId));
 
     QString errorString;
 
-    m_canDeviceR = QCanBus::instance()->createDevice(m_plugin, m_receiver, &errorString);
-    m_canDeviceW = QCanBus::instance()->createDevice(m_plugin, m_sender, &errorString);
-    QVERIFY (m_canDeviceR && m_canDeviceW);
+    QScopedPointer<QCanBusDevice> receiver(QCanBus::instance()->createDevice(m_pluginName, m_receiverName, &errorString));
+    QScopedPointer<QCanBusDevice> sender(QCanBus::instance()->createDevice(m_pluginName, m_senderName, &errorString));
 
-    if (! m_canDeviceR ) {
-        QFAIL(QString("Error: tst_QSerialBus::ReadWriteLoop: Receiving Device wasn't initialized! Error string: " + errorString).toStdString().c_str());
-        return;
-    }
-
-    if (! m_canDeviceW ) {
-        QFAIL(QString("Error: tst_QSerialBus::ReadWriteLoop: Sender Device wasn't initialized! Error string: " + errorString).toStdString().c_str());
-        return;
-    }
-
-    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)
-        m_canDeviceR->connectDevice();
-
-    if (m_canDeviceR->state() == QCanBusDevice::UnconnectedState)  {
-        QFAIL(QString("Error: Read Socket wasn't initialized!").toStdString().c_str());
-    }
-
-    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)
-        m_canDeviceW->connectDevice();
-
-    if (m_canDeviceW->state() == QCanBusDevice::UnconnectedState)  {
-        QFAIL(QString("Error: Write Socket wasn't initialized!").toStdString().c_str());
-        return;
-    }
+    QVERIFY(receiver && sender);
+    QVERIFY(receiver->connectDevice());
+    QVERIFY(sender->connectDevice());
 
     auto frameWriter = [&]() {
-        if (currentWriteFrameNumber >= kMaxFramesCount)
+        if (currentWriteFrameNumber >= maxFramesCount)
             return;
-        QByteArray payload = QByteArray::number(++currentWriteFrameNumber, 16);
+        const auto payload = QByteArray::number(++currentWriteFrameNumber, 16);
         frameW.setPayload(payload); // Add current frame number to payload
-        m_canDeviceW->writeFrame(frameW);
+        sender->writeFrame(frameW);
      };
 
-    auto on_error_occured = [&](QCanBusDevice::CanBusError err) {
-        QString err_string;
-        switch (err) {
-            case QCanBusDevice::NoError:
-                err_string = "NoError";
-                break;
-            case QCanBusDevice::ReadError :
-                err_string = "ReadError";
-                break;
-            case QCanBusDevice::WriteError:
-                err_string = "WriteError";
-                break;
-            case QCanBusDevice::ConnectionError:
-                err_string = "ConnectionError";
-                break;
-            case QCanBusDevice::ConfigurationError:
-                err_string = "ConfigurationError";
-                break;
-            case QCanBusDevice::UnknownError:
-                err_string = "UnknownError";
-                break;
-        }
-
-        err_string.append(QString(", Errno: %1. Do you use the latest patchset of socketcan plugin?").arg(errno));
-
-        QFAIL(err_string.toStdString().c_str());
+    auto errorHandler = [&](QCanBusDevice::CanBusError err) {
+        QVERIFY(err != QCanBusDevice::NoError);
     };
 
-    connect(m_canDeviceW, &QCanBusDevice::framesWritten, frameWriter);
-    connect(m_canDeviceW, &QCanBusDevice::errorOccurred, on_error_occured);
+    connect(sender.get(), &QCanBusDevice::framesWritten, frameWriter);
+    connect(sender.get(), &QCanBusDevice::errorOccurred, errorHandler);
 
     auto frameReader = [&]() {
-        const auto frames = m_canDeviceR->readAllFrames();
+        const auto frames = receiver->readAllFrames();
         for (const auto &frame : frames) {
-            QCOMPARE(frame.frameId(), 0x123);
+            QCOMPARE(frame.frameId(), frameId);
             bool *ok = nullptr;
-            const qulonglong frameNumber = frame.payload().toULongLong(ok, 16); // extract frame number from payload
+            const int frameNumber = frame.payload().toInt(ok, 16);
+            QEXPECT_FAIL("", "Aborrt", Abort);
             QCOMPARE(frameNumber, ++currentReadFrameNumber);
         }
 
-        if (currentReadFrameNumber == kMaxFramesCount)
+        if (currentReadFrameNumber == maxFramesCount)
              exitLoop();
      };
 
-    connect(m_canDeviceR, &QCanBusDevice::framesReceived, frameReader);
-    connect(m_canDeviceR, &QCanBusDevice::errorOccurred, on_error_occured);
+    connect(receiver.get(), &QCanBusDevice::framesReceived, frameReader);
+    connect(sender.get(), &QCanBusDevice::errorOccurred, errorHandler);
 
     frameWriter();
 
-    enterLoop(MAX_TIMEOUT);
+    enterLoop(maxTimeout);
 
-    qInfo() << "write_count = " << currentWriteFrameNumber;
-    qInfo() << "read_count = " << currentReadFrameNumber;
-    QVERIFY (currentWriteFrameNumber == currentReadFrameNumber);
+    QVERIFY(currentWriteFrameNumber == currentReadFrameNumber);
 }
 
 QTEST_MAIN(tst_QSerialBus)
