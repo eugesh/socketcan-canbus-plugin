@@ -40,6 +40,10 @@
 #include <QtSerialBus/qcanbusfactory.h>
 #include <QtSerialBus/qcanbusframe.h>
 #include <QtTest/QtTest>
+#include <qloggingcategory.h>
+
+Q_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_SOCKETCAN, "qt.canbus.plugins.socketcan")
+Q_DECLARE_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_SOCKETCAN)
 
 class tst_QSerialBus : public QObject
 {
@@ -50,7 +54,9 @@ public:
     static void enterLoop(int secs)
     {
         ++loopLevel;
+        qDebug() << "enterLoop, loopLevel = " << loopLevel;
         QTestEventLoop::instance().enterLoop(secs);
+        qDebug() << "enterLoop, loopLevel = " << loopLevel;
         --loopLevel;
     }
 
@@ -122,6 +128,7 @@ void tst_QSerialBus::loopback()
     int currentWriteFrameNumber = 0;
     QCanBusFrame frameW;
     frameW.setFrameId(quint32(frameId));
+    bool is_error_state = false;
 
     QString errorString;
 
@@ -136,12 +143,21 @@ void tst_QSerialBus::loopback()
         if (currentWriteFrameNumber >= maxFramesCount)
             return;
         const auto payload = QByteArray::number(++currentWriteFrameNumber, 16);
-        frameW.setPayload(payload); // Add current frame number to payload
+        frameW.setPayload(payload);
         sender->writeFrame(frameW);
-     };
+        // qDebug () << currentWriteFrameNumber;
+    };
 
     auto errorHandler = [&](QCanBusDevice::CanBusError err) {
+        is_error_state = true;
+        qDebug() << "loopLevel: "  << loopLevel;
+        if (err != QCanBusDevice::NoError) {
+            exitLoop();
+        }
+        qDebug() << "err: "  << err;
         QVERIFY(err != QCanBusDevice::NoError);
+        qErrnoWarning(errno, "Write error");
+        qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "write: errno: %d.", errno);
     };
 
     connect(sender.get(), &QCanBusDevice::framesWritten, frameWriter);
@@ -153,8 +169,9 @@ void tst_QSerialBus::loopback()
             QCOMPARE(frame.frameId(), frameId);
             bool *ok = nullptr;
             const int frameNumber = frame.payload().toInt(ok, 16);
-            QEXPECT_FAIL("", "Aborrt", Abort);
-            QCOMPARE(frameNumber, ++currentReadFrameNumber);
+            if (frameNumber != ++currentReadFrameNumber)
+                 exitLoop();
+            QCOMPARE(currentReadFrameNumber, frameNumber);
         }
 
         if (currentReadFrameNumber == maxFramesCount)
@@ -164,11 +181,18 @@ void tst_QSerialBus::loopback()
     connect(receiver.get(), &QCanBusDevice::framesReceived, frameReader);
     connect(sender.get(), &QCanBusDevice::errorOccurred, errorHandler);
 
+    qDebug() << "loopLevel1: "  << loopLevel;
+
     frameWriter();
 
-    enterLoop(maxTimeout);
+    qDebug() << "loopLevel2: "  << loopLevel;
 
-    QVERIFY(currentWriteFrameNumber == currentReadFrameNumber);
+    if (! is_error_state)
+        enterLoop(maxTimeout);
+
+    qDebug() << "loopLevel3: "  << loopLevel;
+
+    QCOMPARE(currentWriteFrameNumber, currentReadFrameNumber);
 }
 
 QTEST_MAIN(tst_QSerialBus)
