@@ -536,8 +536,9 @@ void SocketCanBackend_v2::writeSocket()
 
         if (Q_UNLIKELY(bytesWritten == -1)) {
             if (Q_UNLIKELY(errno != ENOBUFS && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)) {
-                setError(qt_error_string(errno),
-                         QCanBusDevice::CanBusError::WriteError);
+                const QString error = qt_error_string(errno);
+                qCWarning(QT_CANBUS_PLUGINS_SOCKETCAN, "Write error: %ls", qUtf16Printable(error));
+                setError(error, QCanBusDevice::CanBusError::WriteError);
                 dequeueOutgoingFrame();
             }
             return;
