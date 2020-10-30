@@ -136,7 +136,7 @@ void tst_QSerialBus::loopback()
         if (currentWriteFrameNumber >= maxFramesCount)
             return;
         const auto payload = QByteArray::number(++currentWriteFrameNumber, 16);
-        frameW.setPayload(payload); // Add current frame number to payload
+        frameW.setPayload(payload);
         sender->writeFrame(frameW);
      };
 
@@ -153,8 +153,9 @@ void tst_QSerialBus::loopback()
             QCOMPARE(frame.frameId(), frameId);
             bool *ok = nullptr;
             const int frameNumber = frame.payload().toInt(ok, 16);
-            QEXPECT_FAIL("", "Aborrt", Abort);
-            QCOMPARE(frameNumber, ++currentReadFrameNumber);
+            if (frameNumber != ++currentReadFrameNumber)
+                exitLoop();
+            QCOMPARE(currentReadFrameNumber, frameNumber);
         }
 
         if (currentReadFrameNumber == maxFramesCount)
