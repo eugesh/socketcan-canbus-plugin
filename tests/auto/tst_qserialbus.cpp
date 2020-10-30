@@ -122,6 +122,7 @@ void tst_QSerialBus::loopback()
     int currentWriteFrameNumber = 0;
     QCanBusFrame frameW;
     frameW.setFrameId(quint32(frameId));
+    bool is_error_state = false;
 
     QString errorString;
 
@@ -141,6 +142,10 @@ void tst_QSerialBus::loopback()
      };
 
     auto errorHandler = [&](QCanBusDevice::CanBusError err) {
+        is_error_state = true;
+        if (err != QCanBusDevice::NoError) {
+            exitLoop();
+        }
         QVERIFY(err != QCanBusDevice::NoError);
     };
 
@@ -167,7 +172,8 @@ void tst_QSerialBus::loopback()
 
     frameWriter();
 
-    enterLoop(maxTimeout);
+    if (! is_error_state)
+        enterLoop(maxTimeout);
 
     QVERIFY(currentWriteFrameNumber == currentReadFrameNumber);
 }
