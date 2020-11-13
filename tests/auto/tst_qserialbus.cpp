@@ -107,10 +107,10 @@ void tst_QSerialBus::initTestCase()
 
 void tst_QSerialBus::loopback_data()
 {
-   QTest::addColumn<int>("maxFramesCount");
-   QTest::addColumn<int>("frameId");
-   QTest::addColumn<int>("maxTimeout");
-   QTest::newRow("100600 frames with 0x123 id and 10000 timeout") << 100600 << 0x123 << 10000;
+    QTest::addColumn<int>("maxFramesCount");
+    QTest::addColumn<int>("frameId");
+    QTest::addColumn<int>("maxTimeout");
+    QTest::newRow("100600 frames with 0x123 id and 10000 timeout") << 100600 << 0x123 << 10000;
 }
 
 void tst_QSerialBus::loopback()
@@ -139,7 +139,7 @@ void tst_QSerialBus::loopback()
         const auto payload = QByteArray::number(++currentWriteFrameNumber, 16);
         frameW.setPayload(payload);
         sender->writeFrame(frameW);
-     };
+    };
 
     auto errorHandler = [&](QCanBusDevice::CanBusError err) {
         is_error_state = true;
@@ -164,11 +164,11 @@ void tst_QSerialBus::loopback()
         }
 
         if (currentReadFrameNumber == maxFramesCount)
-             exitLoop();
-     };
+            exitLoop();
+    };
 
     connect(receiver.get(), &QCanBusDevice::framesReceived, frameReader);
-    connect(sender.get(), &QCanBusDevice::errorOccurred, errorHandler);
+    connect(receiver.get(), &QCanBusDevice::errorOccurred, errorHandler);
 
     frameWriter();
 
