@@ -53,4 +53,10 @@ CMakeFiles
 */bin/*
 *.moc
 CMakeCache.txt
+*build-*
+*.txt
+build_*
+*release/
+*build/
+*bin/
 
