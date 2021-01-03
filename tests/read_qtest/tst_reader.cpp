@@ -139,7 +139,14 @@ void tst_QSerialBusReader::loopback()
         for (const auto &frame : frames) {
             QCOMPARE(frame.frameId(), frameId);
             bool *ok = nullptr;
-            const int frameNumber = frame.payload().toInt(ok, 16);
+            const int frameNumber = frame.payload().toHex().toInt(ok, 16);
+            qInfo() << frameNumber << " " << frame.payload().constData() << " " << frame.toString();
+
+            QFile printout;
+            printout.open(stdout, QIODevice::WriteOnly);
+            QDataStream streamout(&printout);
+            streamout << frame;
+
             if (frameNumber != ++currentReadFrameNumber)
                 exitLoop();
             QCOMPARE(currentReadFrameNumber, frameNumber);

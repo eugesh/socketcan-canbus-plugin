@@ -136,7 +136,9 @@ void tst_QSerialBus::loopback()
     auto frameWriter = [&]() {
         if (currentWriteFrameNumber >= maxFramesCount)
             return;
-        const auto payload = QByteArray::number(++currentWriteFrameNumber, 16);
+        const QByteArray payload = QByteArray::fromHex(QString::number(++currentWriteFrameNumber, 16).toLatin1());
+        qInfo() << QString::number(currentWriteFrameNumber, 16) << " " << payload;
+        //const auto payload = QByteArray::number(++currentWriteFrameNumber, 16);
         frameW.setPayload(payload);
         sender->writeFrame(frameW);
     };
